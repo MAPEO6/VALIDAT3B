@@ -20,7 +20,7 @@ import {
 } from "../src/validation.ts";
 
 const MB = 1024 * 1024;
-const datos = { captureId: "CAP-000200", codigo: "7501234567893", producto: "Ariel 900g" };
+const datos = { captureId: "CAP-000200", tienda: "", codigo: "7501234567893", producto: "Ariel 900g" };
 
 // ---------- archivos ----------
 test("archivo: acepta JPG/PNG/WEBP dentro del límite", () => {

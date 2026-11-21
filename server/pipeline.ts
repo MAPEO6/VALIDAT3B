@@ -87,6 +87,9 @@ export function aResultado(captureId: string, ia: RespuestaIA, umbral = UMBRAL_A
   let decision: Decision = ia.decision;
   let nota = "";
 
+  // Coherencia: las 4 validaciones en ok con probabilidad sobre el umbral es una aprobación,
+  // aunque el modelo haya puesto otra etiqueta.
+  if (decision === "revision_manual" && todasOk && ia.probabilidad_valida >= umbral) decision = "aprobada";
   if (decision === "aprobada" && !(todasOk && ia.probabilidad_valida >= umbral)) {
     decision = "revision_manual";
     nota = " (Enviada a revisión: no cumple el umbral de aprobación.)";

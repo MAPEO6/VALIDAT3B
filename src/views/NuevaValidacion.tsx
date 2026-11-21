@@ -142,7 +142,7 @@ export function NuevaValidacion() {
       <section className="card card--gap14 span4" aria-labelledby="h-datos">
         <div className="card__head">
           <h2 id="h-datos"><span className="step-num">1</span>Datos de la captura</h2>
-          <span className="opt">Opcionales</span>
+          <span className="opt"><span className="req-mark" aria-hidden="true">*</span> obligatorio</span>
         </div>
         <label className="lbl">Capture ID
           <input className="field" value={captura.captureId} placeholder={s.idSugerido} maxLength={40}
@@ -152,9 +152,15 @@ export function NuevaValidacion() {
           <FieldMsg id="m-capid" r={capErr.captureId} show={showErr(captura.captureId)}
             ayuda={`Si lo dejas vacío se usará ${s.idSugerido}.`} />
         </label>
-        <label className="lbl"><span><span className="hint__long">Código de barras capturado</span><span className="hint__short">Código de barras</span></span>
+        <label className="lbl">Cadena / tienda
+          <input className="field" value={captura.tienda} placeholder="Neto" maxLength={60} aria-describedby="m-tienda"
+            disabled={isLoading}
+            onChange={(e) => setCaptura({ ...captura, tienda: e.target.value })} />
+          <FieldMsg id="m-tienda" r={{}} show={false} ayuda="Cadena que debe verse en la fachada (ej. Neto, Bodega Aurrera)." />
+        </label>
+        <label className="lbl"><span><span className="hint__long">Código de barras capturado</span><span className="hint__short">Código de barras</span> <span className="req-mark" aria-hidden="true">*</span></span>
           <input className="field" value={captura.codigo} placeholder="7501234567893" inputMode="numeric" maxLength={18}
-            aria-invalid={!!capErr.codigo.error && showErr(captura.codigo)} aria-describedby="m-cod"
+            aria-required="true" aria-invalid={!!capErr.codigo.error && showErr(captura.codigo)} aria-describedby="m-cod"
             disabled={isLoading}
             onChange={(e) => setCaptura({ ...captura, codigo: e.target.value })} />
           <FieldMsg id="m-cod" r={capErr.codigo} show={showErr(captura.codigo)} ayuda="8, 12, 13 o 14 dígitos (EAN/UPC)." />

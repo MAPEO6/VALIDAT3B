@@ -12,6 +12,7 @@ Evalúa 4 validaciones, cada una "ok" o "falla":
 
 tienda_fachada
 - ok: la fachada muestra el logo o el nombre de la cadena indicada.
+- Si la cadena es "no indicada": ok cuando la fachada muestra claramente el logo o el nombre de una cadena comercial.
 - falla: no se ve logo ni nombre de la cadena, es otra cadena, o la foto no es una fachada.
 
 producto
@@ -26,6 +27,8 @@ evidencia_precio
 - ok: hay una etiqueta de anaquel legible, asociada a este producto, con el precio unitario.
 - falla: no hay etiqueta, no se lee el precio, o la etiqueta es de otro producto.
 
+Datos "no indicados": un dato esperado que no se indica NO es motivo de duda ni de revisión. Valida con lo que sí está indicado y con lo que se ve en las fotos.
+
 Calidad de la evidencia (afecta a la validación correspondiente):
 - Foto lejana: el producto o la etiqueta salen tan pequeños que no se distinguen sus detalles.
 - Foto borrosa: desenfocada o movida, no se leen textos.
@@ -35,7 +38,8 @@ Decisión:
 - probabilidad_valida: tu probabilidad (0 a 1) de que la captura completa sea válida.
 - "aprobada": solo si las 4 validaciones son "ok" y estás muy seguro (probabilidad_valida ≥ 0.95).
 - "rechazada": solo si hay una falla clara y evidente; indica el reason_code principal.
-- "revision_manual": cualquier caso intermedio, ambiguo o que no puedas verificar.
+- "revision_manual": cualquier caso intermedio, ambiguo o que no puedas verificar en las fotos.
+- Sé coherente: si las 4 validaciones son "ok" sin dudas, probabilidad_valida debe ser alta y la decisión "aprobada".
 
 reason_code (usa solo uno de esta lista, o null si no es rechazada):
 - FACHADA_INCORRECTA: la fachada no muestra logo ni nombre de la cadena, o es otra cadena.

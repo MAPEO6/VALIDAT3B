@@ -20,6 +20,7 @@ export interface OpcionesFoundry {
   timeoutMs?: number;
   reintentos?: number; // reintentos ante errores transitorios
   esperaBaseMs?: number;
+  maxEsperaMs?: number; // tope de la espera que pida el servidor (Retry-After)
   fetchImpl?: typeof fetch; // inyectable en pruebas
 }
 
@@ -39,11 +40,23 @@ export interface RespuestaModelo {
 export class FoundryError extends Error {
   status: number | null;
   transitorio: boolean;
-  constructor(message: string, status: number | null, transitorio: boolean) {
+  esperaMs: number | null; // espera que pidió el servidor antes de reintentar
+  constructor(message: string, status: number | null, transitorio: boolean, esperaMs: number | null = null) {
     super(message);
     this.status = status;
     this.transitorio = transitorio;
+    this.esperaMs = esperaMs;
   }
+}
+
+// Espera sugerida por el servidor: cabeceras retry-after-ms / retry-after, o "wait N seconds" en el cuerpo (Azure).
+export function esperaSugeridaMs(headers: Headers, cuerpo: string): number | null {
+  const ms = Number(headers.get("retry-after-ms"));
+  if (Number.isFinite(ms) && ms > 0) return ms;
+  const seg = Number(headers.get("retry-after"));
+  if (Number.isFinite(seg) && seg > 0) return seg * 1000;
+  const m = /wait (\d+(?:\.\d+)?) seconds?/i.exec(cuerpo);
+  return m ? Number(m[1]) * 1000 : null;
 }
 
 const esTransitorio = (status: number) =>
@@ -84,12 +97,13 @@ export async function llamarModelo(
         signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
       });
       if (!res.ok) {
-        const cuerpo = (await res.text()).slice(0, 300);
-        throw new FoundryError(
-          `Foundry ${res.status}: ${cuerpo}`,
-          res.status,
-          esTransitorio(res.status),
-        );
+        const cuerpo = await res.text();
+        const espera = esperaSugeridaMs(res.headers, cuerpo);
+        const mensaje =
+          res.status === 429
+            ? "Foundry 429: se alcanzó el límite de uso por minuto del modelo. Espera unos segundos y vuelve a validar."
+            : `Foundry ${res.status}: ${cuerpo.slice(0, 300)}`;
+        throw new FoundryError(mensaje, res.status, esTransitorio(res.status), espera);
       }
       const data = (await res.json()) as {
         content?: { type: string; text?: string }[];
@@ -123,7 +137,10 @@ export async function llamarModelo(
         );
       }
       if (!ultimoError.transitorio || intento > reintentos) break;
-      await dormir(esperaBase * 2 ** (intento - 1));
+      // Se respeta la espera que pida el servidor (+10 % de margen), con tope.
+      const backoff = esperaBase * 2 ** (intento - 1);
+      const pedida = ultimoError.esperaMs ? Math.min(ultimoError.esperaMs * 1.1, opts.maxEsperaMs ?? 15_000) : 0;
+      await dormir(Math.max(backoff, pedida));
     }
   }
   throw (

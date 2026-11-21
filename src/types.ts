@@ -53,6 +53,8 @@ export interface Foto {
 
 export interface CapturaForm {
   captureId: string
+  /** Cadena/tienda de la fachada (ej. Neto). Se envía como meta.tienda. */
+  tienda: string
   codigo: string
   producto: string
 }

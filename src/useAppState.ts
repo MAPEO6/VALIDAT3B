@@ -65,7 +65,7 @@ export function useAppState() {
   const [fotos, setFotos] = useState<(Foto | null)[]>([null, null, null])
   const [fotoErr, setFotoErr] = useState<(string | null)[]>([null, null, null])
   const [masivaMsg, setMasivaMsg] = useState<string[]>([])
-  const [captura, setCaptura] = useState<CapturaForm>({ captureId: '', codigo: '', producto: '' })
+  const [captura, setCaptura] = useState<CapturaForm>({ captureId: '', tienda: '', codigo: '', producto: '' })
   const [intento, setIntento] = useState(false)
   const [phase, setPhase] = useState<Fase>('idle')
   const [segundos, setSegundos] = useState(0)
@@ -151,7 +151,7 @@ export function useAppState() {
   // ---------- verificaciones del formulario (antes de usar el backend) ----------
   const capErr = {
     captureId: validarCaptureId(captura.captureId, ids),
-    codigo: validarCodigoBarras(captura.codigo),
+    codigo: validarCodigoBarras(captura.codigo, true), // obligatorio
     producto: validarProducto(captura.producto),
   }
   const datosConError = Object.values(capErr).some((r) => r.error)
@@ -166,7 +166,7 @@ export function useAppState() {
     if (!fotos[i]) pendientes.push(`Falta la foto ${i + 1}: ${d.label.toLowerCase()}`)
   })
   if (capErr.captureId.error) pendientes.push('Corrige el Capture ID')
-  if (capErr.codigo.error) pendientes.push('Corrige el código de barras')
+  if (capErr.codigo.error) pendientes.push(captura.codigo.trim() ? 'Corrige el código de barras' : 'Escribe el código de barras')
   if (capErr.producto.error) pendientes.push('Corrige el producto esperado')
   const canValidar = pendientes.length === 0 && !isLoading
 
@@ -245,7 +245,7 @@ export function useAppState() {
     })
     setFotoErr([null, null, null])
     setMasivaMsg([])
-    setCaptura({ captureId: '', codigo: '', producto: '' })
+    setCaptura({ captureId: '', tienda: '', codigo: '', producto: '' })
     setIntento(false)
     setErrorServidor(null)
     setPhase('idle')
@@ -254,7 +254,7 @@ export function useAppState() {
 
   /** «Limpiar» pide confirmación si hay algo que perder (heurística 3/5). */
   const resetCapture = () => {
-    const hayAlgo = filledCount > 0 || captura.captureId || captura.codigo || captura.producto
+    const hayAlgo = filledCount > 0 || captura.captureId || captura.tienda || captura.codigo || captura.producto
     if (!hayAlgo || phase === 'done' || phase === 'error') return limpiarTodo()
     setConfirm({
       titulo: '¿Limpiar la captura?',
@@ -283,6 +283,7 @@ export function useAppState() {
     const res = await validarCaptura(
       {
         capture_id: id,
+        ...(captura.tienda.trim() ? { tienda: captura.tienda.trim() } : {}),
         ...(codigo ? { codigo_barras: codigo } : {}),
         ...(captura.producto.trim() ? { producto_esperado: captura.producto.trim() } : {}),
       },
@@ -315,7 +316,7 @@ export function useAppState() {
     setFotos([null, null, null]) // las URL pasan a la captura
     setFotoErr([null, null, null])
     setMasivaMsg([])
-    setCaptura({ captureId: '', codigo: '', producto: '' })
+    setCaptura({ captureId: '', tienda: '', codigo: '', producto: '' })
     setIntento(false)
     if (res.kind === 'tecnico') void revisarServidor()
     showToast(

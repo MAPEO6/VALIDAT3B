@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { buildApp } from "../server/app.ts";
 import { loadConfig, opcionesFoundry } from "../server/config.ts";
-import { llamarModelo, urlMensajes, type OpcionesFoundry } from "../server/foundry.ts";
+import { esperaSugeridaMs, llamarModelo, urlMensajes, type OpcionesFoundry } from "../server/foundry.ts";
 import { aResultado, confianzaDe, detectarMediaType, validarCaptura, type EntradaPipeline } from "../server/pipeline.ts";
 import { RespuestaIASchema, SYSTEM_PROMPT, extraerJson, textoUsuario } from "../server/prompt.ts";
 import { REASON_CODES } from "../server/reason-codes.ts";
@@ -276,4 +276,32 @@ test("POST /api/capturas/:id/validar sin Foundry → 200 revision_manual (error 
   assert.equal(b.meta.fuente_decision, "error");
   assert.equal((await app.inject({ method: "GET", url: "/api/health" })).json().modo, "sin_foundry");
   await app.close();
+});
+
+test("aResultado: revision_manual con 4 ok y probabilidad ≥ umbral → aprobada; bajo umbral sigue en revisión", () => {
+  const alta = aResultado("C", RespuestaIASchema.parse(ia({ decision: "revision_manual", probabilidad_valida: 0.97 })));
+  assert.equal(alta.decision, "aprobada");
+  assert.equal(alta.reason_code, null);
+  const baja = aResultado("C", RespuestaIASchema.parse(ia({ decision: "revision_manual", probabilidad_valida: 0.8 })));
+  assert.equal(baja.decision, "revision_manual");
+});
+
+test("foundry: espera sugerida por el servidor (Retry-After o texto de Azure)", () => {
+  assert.equal(esperaSugeridaMs(new Headers({ "retry-after": "3" }), ""), 3000);
+  assert.equal(esperaSugeridaMs(new Headers({ "retry-after-ms": "1500" }), ""), 1500);
+  assert.equal(esperaSugeridaMs(new Headers(), "Rate limit exceeded. Please wait 3 seconds before retrying."), 3000);
+  assert.equal(esperaSugeridaMs(new Headers(), "otro error"), null);
+});
+
+test("foundry: 429 respeta la espera pedida y el mensaje es claro si se agotan los reintentos", async () => {
+  const pedidas: number[] = [];
+  let n = 0;
+  const f = (async () => {
+    pedidas.push(Date.now());
+    n++;
+    return new Response(JSON.stringify({ error: { message: "Please wait 0.05 seconds before retrying." } }), { status: 429 });
+  }) as typeof fetch;
+  await assert.rejects(llamarModelo(foundry(f, { reintentos: 1 }), { system: "s", content: [], maxTokens: 10 }), /límite de uso por minuto/);
+  assert.equal(n, 2);
+  assert.ok(pedidas[1]! - pedidas[0]! >= 50, "esperó lo que pidió el servidor");
 });
