@@ -2,32 +2,19 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
 import { loadConfig, type Config } from "./config.ts";
 import { REASON_CODES } from "./reason-codes.ts";
+import { crearProveedorDataset, type ProveedorDataset } from "./dataset.ts";
+import { ApiError, cuerpoError } from "./errors.ts";
 import { resultadoMock, resultadoTecnico } from "./mock.ts";
+import { registrarRutasDataset } from "./rutas-dataset.ts";
 import {
   DECISIONES,
   MetaEntradaSchema,
   RespuestaValidarSchema,
-  type CodigoError,
   type Decision,
-  type ErrorRespuesta,
   type RespuestaValidar,
 } from "./schemas.ts";
 
 const CAMPOS_IMAGEN = ["fachada", "producto", "etiqueta"] as const;
-
-class ApiError extends Error {
-  status: number;
-  code: CodigoError;
-  constructor(status: number, code: CodigoError, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
-
-const cuerpoError = (code: CodigoError, message: string): ErrorRespuesta => ({
-  error: { code, message },
-});
 
 // Si no se pide un mock concreto, se elige uno de forma determinista según el capture_id.
 function decisionMock(captureId: string, pedida: unknown): Decision {
@@ -39,7 +26,11 @@ function decisionMock(captureId: string, pedida: unknown): Decision {
   return DECISIONES[h % DECISIONES.length]!;
 }
 
-export function buildApp(config: Config = loadConfig()): FastifyInstance {
+export interface DepsApp {
+  dataset?: ProveedorDataset; // inyectable en pruebas
+}
+
+export function buildApp(config: Config = loadConfig(), deps: DepsApp = {}): FastifyInstance {
   const app = Fastify({ logger: { level: config.LOG_LEVEL } });
 
   app.register(multipart, {
@@ -80,6 +71,16 @@ export function buildApp(config: Config = loadConfig()): FastifyInstance {
     modo: "mock", // cambiará cuando el pipeline real esté conectado
     modelo: config.FOUNDRY_MODEL,
   }));
+
+  registrarRutasDataset(
+    app,
+    deps.dataset ??
+      crearProveedorDataset({
+        dir: config.DATA_DIR,
+        capturasFile: config.CAPTURAS_FILE,
+        catalogoFile: config.CATALOGO_FILE,
+      }),
+  );
 
   app.get("/api/reason-codes", async () => ({ reason_codes: REASON_CODES }));
 

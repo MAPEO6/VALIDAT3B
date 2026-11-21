@@ -12,7 +12,8 @@
     "dev:all": "concurrently \"npm:server\" \"npm:dev\"",
     "start": "tsx server/index.ts",
     "test": "tsx --test tests/*.test.ts",
-    "typecheck": "tsc -p tsconfig.server.json"
+    "typecheck": "tsc -p tsconfig.server.json",
+    "dataset:check": "tsx scripts/verificar-dataset.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.9",
