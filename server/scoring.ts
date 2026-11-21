@@ -416,6 +416,10 @@ export function formatearReporte(r: Reporte): string {
   if (d.invalidas.length > 20) L.push(`... y ${d.invalidas.length - 20} JSON inválidos más`);
   for (const x of d.reason_code_distinto.slice(0, 20)) L.push(`reason_code distinto ${x.capture_id}: esperado ${x.esperado}, obtenido ${x.obtenido}`);
   L.push("");
-  L.push(r.requisitos_cumplidos ? "RESULTADO: CUMPLE REQUISITOS" : "RESULTADO: NO CUMPLE REQUISITOS");
+  if (r.capturas_etiquetadas === 0) {
+    L.push(`SET SIN ETIQUETAS: solo se mide JSON válido → ${marca(r.json.cumple_99)}`);
+  } else {
+    L.push(r.requisitos_cumplidos ? "RESULTADO: CUMPLE REQUISITOS" : "RESULTADO: NO CUMPLE REQUISITOS");
+  }
   return L.join("\n");
 }

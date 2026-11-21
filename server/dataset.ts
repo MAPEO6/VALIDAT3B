@@ -114,7 +114,8 @@ export async function cargarDataset(opts: OpcionesDataset): Promise<Dataset> {
 
   let crudoCapturas: unknown;
   try {
-    crudoCapturas = JSON.parse(await readFile(rutaCapturas, "utf-8"));
+    const texto = await readFile(rutaCapturas, "utf-8");
+    crudoCapturas = rutaCapturas.toLowerCase().endsWith(".csv") ? parseCsv(texto) : JSON.parse(texto);
   } catch (e) {
     throw new Error(`No se pudo leer ${rutaCapturas}: ${(e as Error).message}`, { cause: e });
   }

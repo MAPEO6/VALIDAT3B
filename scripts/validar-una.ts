@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { loadConfig, opcionesFoundry, opcionesImagen, opcionesReglas } from "../server/config.ts";
 import { cargarDataset, TIPOS_IMAGEN } from "../server/dataset.ts";
+import { cargarParametros } from "../server/decision.ts";
 import { llamarModelo } from "../server/foundry.ts";
 import { campoDesdeCaptura, contextoDesdeCaptura, validarCaptura } from "../server/pipeline.ts";
 
@@ -46,7 +47,7 @@ const [facade, product, shelf] = await Promise.all(TIPOS_IMAGEN.map((t) => readF
 const inicio = performance.now();
 const s = await validarCaptura(
   { contexto: contextoDesdeCaptura(cap), campo: campoDesdeCaptura(cap), imagenes: { facade: facade!, product: product!, shelf: shelf! } },
-  { foundry, maxTokens: c.MAX_TOKENS_SALIDA, imagen: opcionesImagen(c), leerCodigos: c.LEER_CODIGOS, reglas: opcionesReglas(c) },
+  { foundry, maxTokens: c.MAX_TOKENS_SALIDA, imagen: opcionesImagen(c), leerCodigos: c.LEER_CODIGOS, reglas: opcionesReglas(c), decision: cargarParametros() },
 );
 console.log("== RESPUESTA CRUDA DEL MODELO");
 console.log(s.respuesta_modelo ?? "(sin respuesta)");
