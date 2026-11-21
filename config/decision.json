@@ -1,0 +1,9 @@
+{
+  "umbralAprobar": 0.99,
+  "umbralAprobarConCodigo": 0.7,
+  "umbralRechazar": 0,
+  "respetarRevisionModelo": true,
+  "respetarDecisionModelo": true,
+  "precioBloqueaAprobacion": true,
+  "inferirReasonCode": true
+}
