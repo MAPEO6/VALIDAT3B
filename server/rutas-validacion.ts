@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { opcionesFoundry, type Config } from "./config.ts";
+import { opcionesFoundry, opcionesImagen, type Config } from "./config.ts";
+import { IndiceDuplicados } from "./duplicados.ts";
 import { TIPOS_IMAGEN, type ProveedorDataset } from "./dataset.ts";
 import { ApiError } from "./errors.ts";
 import { resultadoMock } from "./mock.ts";
@@ -27,6 +28,8 @@ export function registrarRutasValidacion(
 ) {
   const foundryBase = opcionesFoundry(config);
   const foundry = foundryBase ? { ...foundryBase, fetchImpl } : null;
+  // Un índice por proceso: detecta fotos de producto/etiqueta reutilizadas entre capturas validadas.
+  const indiceDuplicados = new IndiceDuplicados(config.DUP_UMBRAL_HAMMING);
 
   async function responder(req: FastifyRequest<{ Querystring: Query }>, entrada: EntradaPipeline): Promise<RespuestaValidar> {
     const inicio = performance.now();
@@ -45,6 +48,9 @@ export function registrarRutasValidacion(
     const salida: SalidaPipeline = await validarCaptura(entrada, {
       foundry,
       maxTokens: config.MAX_TOKENS_SALIDA,
+      imagen: opcionesImagen(config),
+      indiceDuplicados,
+      leerCodigos: config.LEER_CODIGOS,
     });
     const respuesta: RespuestaValidar = {
       resultado: salida.resultado,
@@ -52,10 +58,14 @@ export function registrarRutasValidacion(
       meta: { latencia_ms: latencia(), fuente_decision: salida.fuente_decision },
     };
     if (req.query.debug === "1") {
-      respuesta.debug = { respuesta_modelo: salida.respuesta_modelo ?? null, intentos_modelo: salida.intentos_modelo };
+      respuesta.debug = {
+        respuesta_modelo: salida.respuesta_modelo ?? null,
+        intentos_modelo: salida.intentos_modelo,
+        analisis_imagenes: salida.analisis,
+      };
     }
     req.log.info(
-      { capture_id: id, decision: salida.resultado.decision, fuente: salida.fuente_decision, usage: salida.usage, intentos: salida.intentos_modelo, ms: latencia() },
+      { capture_id: id, decision: salida.resultado.decision, fuente: salida.fuente_decision, usage: salida.usage, intentos: salida.intentos_modelo, ms: latencia(), ms_imagenes: salida.analisis?.ms, codigo_ok: salida.analisis?.codigo_barras.coincide_esperado },
       "validacion",
     );
     if (salida.fuente_decision === "error") req.log.warn({ capture_id: id, motivo: salida.resultado.explicacion }, "validacion con error tecnico");

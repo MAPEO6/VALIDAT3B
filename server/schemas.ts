@@ -63,7 +63,13 @@ export const RespuestaValidarSchema = z.object({
     fuente_decision: z.enum(["mock", "regla", "ia", "error"]),
   }),
   // Solo con ?debug=1: texto crudo del modelo e intentos (para pruebas).
-  debug: z.object({ respuesta_modelo: z.string().nullable(), intentos_modelo: z.number() }).optional(),
+  debug: z
+    .object({
+      respuesta_modelo: z.string().nullable(),
+      intentos_modelo: z.number(),
+      analisis_imagenes: z.unknown().optional(), // AnalisisCaptura (server/preprocesado.ts)
+    })
+    .optional(),
 });
 export type RespuestaValidar = z.infer<typeof RespuestaValidarSchema>;
 

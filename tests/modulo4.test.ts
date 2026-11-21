@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import sharp from "sharp";
 import { buildApp } from "../server/app.ts";
 import { loadConfig, opcionesFoundry } from "../server/config.ts";
 import { llamarModelo, urlMensajes, type OpcionesFoundry } from "../server/foundry.ts";
@@ -38,7 +39,8 @@ const ia = (extra: Record<string, unknown> = {}) => ({
 });
 const falla = (campo: string) => ({ ...ia().validaciones, [campo]: "falla" });
 
-const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 1, 2]);
+// JPEG real y pequeño (desde el módulo 5 las imágenes se decodifican con sharp).
+const JPG = await sharp({ create: { width: 16, height: 16, channels: 3, background: "#808080" } }).jpeg().toBuffer();
 const entrada: EntradaPipeline = {
   contexto: { capture_id: "CAP-T1", tienda: "Walmart", producto: "Arroz 1000g", marca: "SOS", contenido: "1000 gramo", codigo_barras_esperado: "7501372812565" },
   imagenes: { facade: JPG, product: JPG, shelf: JPG },
@@ -198,7 +200,7 @@ test("pipeline: sin Foundry configurado → revision_manual sin llamar a nada", 
   assert.equal(ResultadoSchema.safeParse(s.resultado).success, true);
 });
 
-test("pipeline: archivo que no es imagen → revision_manual sin llamar al modelo", async () => {
+test("pipeline: archivo que no es imagen → revision_manual sin llamar al modelo (M4)", async () => {
   const t = fakeFetch([{ texto: JSON.stringify(ia()) }]);
   const s = await validarCaptura({ ...entrada, imagenes: { ...entrada.imagenes, shelf: Buffer.from("hola") } }, { foundry: foundry(t.f) });
   assert.equal(t.llamadas.length, 0);

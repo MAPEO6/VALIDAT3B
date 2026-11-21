@@ -3,7 +3,7 @@
 //      npm run validar -- --ping        (solo prueba la conexión con Foundry, sin imágenes)
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { loadConfig, opcionesFoundry } from "../server/config.ts";
+import { loadConfig, opcionesFoundry, opcionesImagen } from "../server/config.ts";
 import { cargarDataset, TIPOS_IMAGEN } from "../server/dataset.ts";
 import { llamarModelo } from "../server/foundry.ts";
 import { contextoDesdeCaptura, validarCaptura } from "../server/pipeline.ts";
@@ -46,10 +46,19 @@ const [facade, product, shelf] = await Promise.all(TIPOS_IMAGEN.map((t) => readF
 const inicio = performance.now();
 const s = await validarCaptura(
   { contexto: contextoDesdeCaptura(cap), imagenes: { facade: facade!, product: product!, shelf: shelf! } },
-  { foundry, maxTokens: c.MAX_TOKENS_SALIDA },
+  { foundry, maxTokens: c.MAX_TOKENS_SALIDA, imagen: opcionesImagen(c), leerCodigos: c.LEER_CODIGOS },
 );
 console.log("== RESPUESTA CRUDA DEL MODELO");
 console.log(s.respuesta_modelo ?? "(sin respuesta)");
+if (s.analisis) {
+  const a = s.analisis;
+  console.log("\n== IMÁGENES (preprocesado local)");
+  for (const [t, i] of Object.entries(a.imagenes)) {
+    console.log(`${t.padEnd(8)} ${i.original.ancho}×${i.original.alto} ${Math.round(i.original.bytes / 1024)} KB → ${i.enviada.ancho}×${i.enviada.alto} ${Math.round(i.enviada.bytes / 1024)} KB · nitidez ${i.nitidez} · ~${i.tokens_estimados} tokens`);
+  }
+  console.log(`código de barras leído: ${a.codigo_barras.leidos.join(", ") || "ninguno"} · coincide con esperado: ${a.codigo_barras.coincide_esperado}`);
+  console.log(`duplicados: product=${a.duplicados.product?.capture_id ?? "no"} shelf=${a.duplicados.shelf?.capture_id ?? "no"} · ${a.ms} ms`);
+}
 console.log("\n== RESULTADO (JSON oficial)");
 console.log(JSON.stringify(s.resultado, null, 2));
 console.log(`\nfuente: ${s.fuente_decision} · intentos: ${s.intentos_modelo} · tokens: ${s.usage.input_tokens} in / ${s.usage.output_tokens} out · ${Math.round(performance.now() - inicio)} ms`);

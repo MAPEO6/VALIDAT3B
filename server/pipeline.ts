@@ -1,6 +1,9 @@
 // Valida UNA captura: imágenes + contexto → modelo → JSON oficial.
 // Cualquier fallo técnico termina en revision_manual (costo 1), nunca en aprobada.
 import type { Captura } from "./dataset.ts";
+import type { IndiceDuplicados } from "./duplicados.ts";
+import type { OpcionesImagen } from "./imagen.ts";
+import { preprocesarCaptura, type AnalisisCaptura, type SalidaPreprocesado } from "./preprocesado.ts";
 import { FoundryError, llamarModelo, type ContentBlock, type OpcionesFoundry, type Usage } from "./foundry.ts";
 import { resultadoTecnico } from "./mock.ts";
 import { RespuestaIASchema, SYSTEM_PROMPT, extraerJson, textoUsuario, type ContextoCaptura, type RespuestaIA } from "./prompt.ts";
@@ -23,6 +26,7 @@ export interface SalidaPipeline {
   fuente_decision: "ia" | "error";
   intentos_modelo: number;
   respuesta_modelo?: string; // texto crudo, solo para depuración
+  analisis?: AnalisisCaptura; // señales locales (módulo 5) para reglas y decisión
 }
 
 export interface OpcionesPipeline {
@@ -30,6 +34,9 @@ export interface OpcionesPipeline {
   maxTokens?: number;
   reintentosFormato?: number; // reintentos si el modelo no devuelve JSON válido
   umbralAprobacion?: number;
+  imagen?: OpcionesImagen; // tamaño y calidad de lo que se envía al modelo
+  indiceDuplicados?: IndiceDuplicados; // compartido entre capturas (API o lote)
+  leerCodigos?: boolean; // lectura local de código de barras (default: sí)
 }
 
 // PROVISIONAL (lo reemplaza el motor de decisión del módulo 7).
@@ -55,7 +62,7 @@ export function contextoDesdeCaptura(c: Captura): ContextoCaptura {
   };
 }
 
-export function construirContenido(entrada: EntradaPipeline): ContentBlock[] {
+export function construirContenido(contexto: ContextoCaptura, enviar: SalidaPreprocesado["enviar"]): ContentBlock[] {
   const bloques: ContentBlock[] = [];
   const etiquetas: [keyof ImagenesCaptura, string][] = [
     ["facade", "Imagen 1: FACHADA"],
@@ -63,13 +70,11 @@ export function construirContenido(entrada: EntradaPipeline): ContentBlock[] {
     ["shelf", "Imagen 3: ETIQUETA DE PRECIO"],
   ];
   for (const [tipo, titulo] of etiquetas) {
-    const buf = entrada.imagenes[tipo];
-    const media = detectarMediaType(buf);
-    if (!media) throw new Error(`la imagen ${tipo} no es JPEG, PNG, WEBP ni GIF`);
+    const img = enviar[tipo];
     bloques.push({ type: "text", text: titulo });
-    bloques.push({ type: "image", source: { type: "base64", media_type: media, data: buf.toString("base64") } });
+    bloques.push({ type: "image", source: { type: "base64", media_type: img.media_type, data: img.buffer.toString("base64") } });
   }
-  bloques.push({ type: "text", text: textoUsuario(entrada.contexto) });
+  bloques.push({ type: "text", text: textoUsuario(contexto) });
   return bloques;
 }
 
@@ -118,22 +123,36 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
   let usage: Usage = { input_tokens: 0, output_tokens: 0 };
   let intentos = 0;
   let ultimoTexto: string | undefined;
+  let analisis: AnalisisCaptura | undefined;
   const error = (motivo: string): SalidaPipeline => ({
     resultado: resultadoTecnico(id, motivo),
     usage,
     fuente_decision: "error",
     intentos_modelo: intentos,
     respuesta_modelo: ultimoTexto,
+    analisis,
   });
 
-  if (!opts.foundry) return error("Foundry no configurado (FOUNDRY_API_KEY / FOUNDRY_ENDPOINT)");
-
-  let contenido: ContentBlock[];
-  try {
-    contenido = construirContenido(entrada);
-  } catch (e) {
-    return error((e as Error).message);
+  // 1) Preprocesado local (sharp + código de barras + duplicados). Una imagen ilegible es error técnico.
+  for (const [tipo, buf] of Object.entries(entrada.imagenes)) {
+    if (!detectarMediaType(buf)) return error(`la imagen ${tipo} no es JPEG, PNG, WEBP ni GIF`);
   }
+  let pre: SalidaPreprocesado;
+  try {
+    pre = await preprocesarCaptura(id, entrada.imagenes, {
+      imagen: opts.imagen,
+      codigoEsperado: entrada.contexto.codigo_barras_esperado,
+      indice: opts.indiceDuplicados,
+      leerBarras: opts.leerCodigos,
+    });
+    analisis = pre.analisis;
+  } catch (e) {
+    return error(`no se pudo procesar la imagen: ${(e as Error).message}`);
+  }
+
+  // 2) Modelo.
+  if (!opts.foundry) return error("Foundry no configurado (FOUNDRY_API_KEY / FOUNDRY_ENDPOINT)");
+  const contenido = construirContenido(entrada.contexto, pre.enviar);
 
   const reintentosFormato = opts.reintentosFormato ?? 1;
   let ultimoProblema = "";
@@ -145,7 +164,7 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
       ultimoTexto = r.text;
       const ia = RespuestaIASchema.parse(extraerJson(r.text));
       const resultado = ResultadoSchema.parse(aResultado(id, ia, opts.umbralAprobacion));
-      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text };
+      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text, analisis };
     } catch (e) {
       if (e instanceof FoundryError) return error(e.message); // ya reintentó lo transitorio
       ultimoProblema = `respuesta del modelo inválida: ${(e as Error).message.slice(0, 200)}`;
