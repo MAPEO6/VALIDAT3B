@@ -3,7 +3,10 @@
 
 export type ContentBlock =
   | { type: "text"; text: string }
-  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+  | {
+      type: "image";
+      source: { type: "base64"; media_type: string; data: string };
+    };
 
 export interface Usage {
   input_tokens: number;
@@ -43,7 +46,8 @@ export class FoundryError extends Error {
   }
 }
 
-const esTransitorio = (status: number) => status === 408 || status === 429 || status >= 500;
+const esTransitorio = (status: number) =>
+  status === 408 || status === 429 || status >= 500;
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function urlMensajes(endpoint: string): string {
@@ -51,7 +55,10 @@ export function urlMensajes(endpoint: string): string {
   return base.endsWith("/v1/messages") ? base : `${base}/v1/messages`;
 }
 
-export async function llamarModelo(opts: OpcionesFoundry, llamada: LlamadaModelo): Promise<RespuestaModelo> {
+export async function llamarModelo(
+  opts: OpcionesFoundry,
+  llamada: LlamadaModelo,
+): Promise<RespuestaModelo> {
   const f = opts.fetchImpl ?? fetch;
   const reintentos = opts.reintentos ?? 2;
   const esperaBase = opts.esperaBaseMs ?? 1000;
@@ -71,7 +78,6 @@ export async function llamarModelo(opts: OpcionesFoundry, llamada: LlamadaModelo
         body: JSON.stringify({
           model: opts.model,
           max_tokens: llamada.maxTokens,
-          temperature: 0,
           system: llamada.system,
           messages: [{ role: "user", content: llamada.content }],
         }),
@@ -79,7 +85,11 @@ export async function llamarModelo(opts: OpcionesFoundry, llamada: LlamadaModelo
       });
       if (!res.ok) {
         const cuerpo = (await res.text()).slice(0, 300);
-        throw new FoundryError(`Foundry ${res.status}: ${cuerpo}`, res.status, esTransitorio(res.status));
+        throw new FoundryError(
+          `Foundry ${res.status}: ${cuerpo}`,
+          res.status,
+          esTransitorio(res.status),
+        );
       }
       const data = (await res.json()) as {
         content?: { type: string; text?: string }[];
@@ -87,7 +97,10 @@ export async function llamarModelo(opts: OpcionesFoundry, llamada: LlamadaModelo
         stop_reason?: string | null;
       };
       return {
-        text: (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join(""),
+        text: (data.content ?? [])
+          .filter((b) => b.type === "text")
+          .map((b) => b.text ?? "")
+          .join(""),
         usage: {
           input_tokens: data.usage?.input_tokens ?? 0,
           output_tokens: data.usage?.output_tokens ?? 0,
@@ -99,12 +112,21 @@ export async function llamarModelo(opts: OpcionesFoundry, llamada: LlamadaModelo
       if (e instanceof FoundryError) ultimoError = e;
       else {
         const nombre = (e as Error).name;
-        const msg = nombre === "TimeoutError" || nombre === "AbortError" ? "tiempo de espera agotado" : (e as Error).message;
-        ultimoError = new FoundryError(`Foundry sin respuesta: ${msg}`, null, true);
+        const msg =
+          nombre === "TimeoutError" || nombre === "AbortError"
+            ? "tiempo de espera agotado"
+            : (e as Error).message;
+        ultimoError = new FoundryError(
+          `Foundry sin respuesta: ${msg}`,
+          null,
+          true,
+        );
       }
       if (!ultimoError.transitorio || intento > reintentos) break;
       await dormir(esperaBase * 2 ** (intento - 1));
     }
   }
-  throw ultimoError ?? new FoundryError("Foundry: error desconocido", null, false);
+  throw (
+    ultimoError ?? new FoundryError("Foundry: error desconocido", null, false)
+  );
 }
