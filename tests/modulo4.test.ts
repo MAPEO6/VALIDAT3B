@@ -126,7 +126,7 @@ test("foundry: URL, cabeceras, modelo, temperatura 0 y 3 imágenes en orden", as
   assert.equal(l.headers["x-api-key"], "k");
   assert.equal(l.headers["api-key"], "k");
   assert.equal(l.body.model, "claude-haiku-5-5");
-  assert.equal(l.body.temperature, 0);
+  assert.equal("temperature" in l.body, false); // el modelo en Foundry no acepta temperature
   const content = (l.body.messages as { content: { type: string; text?: string }[] }[])[0]!.content;
   assert.deepEqual(content.map((b) => b.type), ["text", "image", "text", "image", "text", "image", "text"]);
   assert.deepEqual(content.filter((b) => b.type === "text").slice(0, 3).map((b) => b.text), ["Imagen 1: FACHADA", "Imagen 2: PRODUCTO", "Imagen 3: ETIQUETA DE PRECIO"]);
