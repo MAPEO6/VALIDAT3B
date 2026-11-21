@@ -4,25 +4,73 @@ Motor de validación de capturas de precio.
 
 Aplicación que recibe **3 imágenes** de una captura de campo (fachada, producto y etiqueta de precio) más sus datos (capture_id, código de barras, producto esperado) y devuelve un **JSON** con la decisión (`aprobada`, `rechazada` o `revision_manual`), el nivel de confianza, el motivo, el precio detectado y una explicación. El análisis lo hace un modelo de visión desplegado en **Azure AI Foundry**.
 
-## 0. Frontend (diseño, sin backend)
+## 0. Frontend conectado al backend (rama `Design`)
 
-La interfaz está construida en React + TypeScript + Vite siguiendo el diseño de `VALIDAT3B - Panel de Validación`. **Solo es diseño**: todo vive en memoria y la validación es simulada; no se llama a `/api/validar`.
+La interfaz (React + TypeScript + Vite) ya consume el backend Fastify del Módulo 1. Reutiliza los esquemas zod de `server/schemas.ts`, así que el contrato es uno solo para el servidor y el navegador.
 
 ```bash
-npm install
-npm run dev        # solo el frontend, http://localhost:5173
+npm ci
+npm run dev:all    # API en :3001 + frontend en http://localhost:5173 (Vite redirige /api)
+npm test           # pruebas del backend y de las verificaciones del frontend
+npm run build      # typecheck del frontend + build
 ```
 
 | Ruta | Contenido |
 |---|---|
-| `src/useAppState.ts` | Todo el estado y las acciones (un hook + `AppContext`). **`validar()` es el punto de conexión al backend**: ahí se reemplaza `buildSimulated` por la llamada a `POST /api/validar`. |
-| `src/data.ts` | Datos de ejemplo, motivos de rechazo (provisionales), textos y la simulación de resultados. |
-| `src/views/` | Una vista por sección: Nueva validación, Revisión manual, PriceCheck, Validados, Rechazados. |
-| `src/components/` | Barra lateral, barra superior/inferior/menú móvil, avisos, miniaturas. |
-| `src/export.ts` | Descarga de JSON (formato de `/api/validar`) y Excel (`xlsx`). |
-| `src/index.css` | Estilos; en pantallas menores a 900 px pasa a diseño móvil. |
+| `src/api.ts` | Cliente de `GET /api/health`, `GET /api/reason-codes` y `POST /api/validar`. Valida la respuesta con `RespuestaValidarSchema`, cancela con `AbortController` y corta a los 60 s. Reduce las fotos a 1024 px antes de enviarlas. |
+| `src/validation.ts` | Verificaciones de archivos y formularios **antes** de llamar al backend (funciones puras, probadas en `tests/frontend.test.ts`). |
+| `src/mapping.ts` | Traducción contrato ↔ UI, textos de cada `reason_code` y exportación JSON compatible con `ResultadoSchema`. |
+| `src/useAppState.ts` | Estado y acciones: validación real, estado del servidor, deshacer, confirmaciones. |
+| `src/components/` | Pasos (`Stepper`), ayuda y confirmación (`Dialogs`), estado del servidor, mensajes de campo, avisos. |
+| `src/views/` | Nueva validación, Revisión manual, PriceCheck, Validados, Rechazados. |
 
-El control **Demo del resultado** (en la tarjeta de resultado, antes de validar) fuerza el resultado simulado: aprobada, revisión, rechazada o error técnico. Se elimina al conectar el backend.
+**Cómo se interpreta la respuesta**
+
+| Respuesta del backend | Qué hace la UI |
+|---|---|
+| 200 · `aprobada` | Pasa a *Productos validados* y a la cola de PriceCheck. |
+| 200 · `rechazada` | Se archiva en *Rechazados* con el texto del `reason_code`. |
+| 200 · `revision_manual` | Va a *Revisión manual* («El modelo no está seguro»). |
+| 200 · `meta.fuente_decision: "error"` | *Revisión manual* como **error técnico**; las validaciones se muestran «sin datos», no «falla». |
+| 4xx (`IMAGENES_FALTANTES`, `META_INVALIDA`, `SOLICITUD_INVALIDA`, `ARCHIVO_DEMASIADO_GRANDE`) | No se crea captura. Se muestra el error con instrucciones y se conservan fotos y datos para corregir. |
+| 5xx, sin conexión, timeout o JSON fuera de contrato | *Revisión manual* como error técnico. Nunca se aprueba sola. |
+
+Mientras `GET /api/health` responda `modo: "mock"`, aparece el selector **«Servidor en modo simulado · forzar resultado»**, que envía `?mock=aprobada|rechazada|revision_manual`. Desaparece solo cuando el pipeline real esté conectado.
+
+### Verificaciones antes de usar el backend
+
+| Qué | Regla | Tipo |
+|---|---|---|
+| Formato de foto | JPG, PNG o WEBP | Bloquea |
+| Peso | > 0 y ≤ 25 MB (igual que `MAX_UPLOAD_MB`) | Bloquea |
+| Archivo dañado | Se abre con `createImageBitmap`; si falla, se rechaza | Bloquea |
+| Resolución | ≥ 320 px por lado (por debajo el precio no se lee) | Bloquea |
+| Foto repetida | La misma foto en dos lugares | Bloquea |
+| Orden | Fachada → producto → etiqueta; cada lugar es fijo | Guía |
+| Capture ID | Opcional (se genera `CAP-000000`); solo `A-Z 0-9 - _`, ≤ 40, sin duplicados | Bloquea · aviso si no es `CAP-` + 6 dígitos |
+| Código de barras | Opcional; solo dígitos, 8/12/13/14 | Bloquea · aviso si el dígito verificador GS1 no cuadra |
+| Producto esperado | Opcional; 3–120 caracteres | Bloquea |
+| Revisión: producto y precio | Obligatorios; precio > 0, ≤ 100 000, máx. 2 decimales (acepta coma) | Bloquea |
+| Revisión: verificaciones | Las 5 marcadas para validar; motivo elegido para rechazar | Bloquea |
+
+El botón «Validar» no se deshabilita en silencio: si falta algo, al pulsarlo lista exactamente qué falta.
+
+### Las 10 heurísticas de usabilidad (Nielsen)
+
+| # | Heurística | Cómo se aplica |
+|---|---|---|
+| 1 | Visibilidad del estado del sistema | Indicador del servidor (conectado / simulado / sin conexión, con «Reintentar»), barra de pasos *Datos → Fotos → Validar → Resultado*, contador de segundos mientras analiza, avisos tras cada acción, contadores en el menú. |
+| 2 | Relación con el mundo real | Motivos en lenguaje del usuario («Foto borrosa») con el código técnico al lado, confianza en %, «correcto / falla / sin datos». |
+| 3 | Control y libertad | «Cancelar» durante el análisis (o `Esc`), «Deshacer» al validar o rechazar en revisión, quitar o cambiar una sola foto sin perder las demás. |
+| 4 | Consistencia y estándares | Mismos colores y etiquetas de decisión en todas las vistas; la lista de motivos viene de `GET /api/reason-codes`; JSON descargado con el mismo contrato del backend. |
+| 5 | Prevención de errores | Todas las verificaciones de la tabla anterior; confirmación antes de «Limpiar» y antes de enviar a PriceCheck; Excel deshabilitado si no hay validados. |
+| 6 | Reconocer antes que recordar | Cada lugar de foto dice qué debe mostrar; formato y límites visibles; el ID que se va a usar aparece como sugerencia; pasos numerados también en Revisión manual. |
+| 7 | Flexibilidad y eficiencia | `Ctrl/⌘ + Enter` valida, `?` abre la ayuda, arrastrar y soltar sobre cada lugar, modo «Las 3 a la vez». |
+| 8 | Diseño estético y minimalista | Se quitó el control «Demo del resultado»; el selector de simulación solo aparece en modo mock; mensajes de ayuda cortos bajo cada campo. |
+| 9 | Reconocer, diagnosticar y recuperarse de errores | Mensajes que dicen qué pasó y cómo corregirlo (por campo y por foto); errores 4xx del backend traducidos; ante fallo técnico, la captura queda a salvo en Revisión manual. |
+| 10 | Ayuda y documentación | Botón «Ayuda» / «¿Cómo funciona?» con el flujo completo, qué significa cada decisión y los atajos. |
+
+Accesibilidad: enlace «Saltar al contenido», `aria-invalid` / `aria-describedby` en campos, `aria-current` en navegación y pasos, regiones `aria-live` para avisos, diálogos con foco y `Esc`, y respeto a `prefers-reduced-motion`.
 
 ## 1. Qué cambió respecto a la plantilla de Vite
 

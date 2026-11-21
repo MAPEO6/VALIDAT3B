@@ -1,25 +1,6 @@
 import * as XLSX from 'xlsx'
+import { toApiJson } from './mapping'
 import type { Captura } from './types'
-
-/** Mismo formato que la respuesta de /api/validar. */
-export function toApiJson(c: Captura) {
-  return {
-    capture_id: c.id,
-    decision: c.status === 'rechazada' ? 'rechazada' : c.status === 'revision' ? 'revision_manual' : 'aprobada',
-    confidence_score: c.confianza,
-    reason_code: c.motivo === '—' ? null : c.motivo,
-    validaciones: {
-      tienda_fachada: c.val.f,
-      producto: c.val.p,
-      codigo_barras: c.val.c,
-      evidencia_precio: c.val.e,
-    },
-    precio_detectado: c.precio,
-    tipo_precio: c.tipo,
-    codigo_barras_detectado: c.codigo || null,
-    explicacion: c.explicacion || c.notas || '',
-  }
-}
 
 function save(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)

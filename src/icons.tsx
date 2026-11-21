@@ -71,3 +71,22 @@ export const IconSpinner = ({ size = 17, light = true }: P & { light?: boolean }
     <path d="M21 12a9 9 0 00-9-9" stroke={light ? 'white' : '#2454FF'} strokeWidth="3" strokeLinecap="round" />
   </Svg>
 )
+export const IconHelp = ({ size = 18 }: P) => (
+  <Svg size={size}>
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+    <path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="12" cy="17" r="1.1" fill="currentColor" />
+  </Svg>
+)
+export const IconAlert = ({ size = 16 }: P) => (
+  <Svg size={size}>
+    <path d="M12 3.5L2.8 19.5h18.4L12 3.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    <path d="M12 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="12" cy="16.9" r="1.1" fill="currentColor" />
+  </Svg>
+)
+export const IconRefresh = ({ size = 14 }: P) => (
+  <Svg size={size}>
+    <path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+)

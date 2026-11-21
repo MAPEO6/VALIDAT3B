@@ -2,8 +2,11 @@ export type View = 'nueva' | 'revision' | 'pricecheck' | 'validados' | 'rechazad
 export type Status = 'validada' | 'enviada' | 'revision' | 'rechazada'
 export type Origen = 'IA' | 'Manual'
 export type TipoPrecio = 'regular' | 'oferta' | 'volumen'
-export type Val = 'ok' | 'falla' | 'dudoso' | 'na'
-export type Simulacion = 'exito' | 'revision' | 'rechazada' | 'error'
+/** 'ok' | 'falla' vienen del contrato; 'na' = sin datos (error técnico o captura manual). */
+export type Val = 'ok' | 'falla' | 'na'
+/** Forzar resultado del backend simulado (?mock=). 'auto' = según capture_id. */
+export type MockOpcion = 'auto' | 'aprobada' | 'rechazada' | 'revision_manual'
+export type Fuente = 'mock' | 'regla' | 'ia' | 'error'
 export type Fase = 'idle' | 'loading' | 'done' | 'error'
 export type CheckKey = 'fachada' | 'producto' | 'codigo' | 'etiqueta' | 'precio'
 export type Mode = 'secuencial' | 'masiva'
@@ -23,6 +26,8 @@ export interface Captura {
   tipo: TipoPrecio
   confianza: number | null
   origen: Origen
+  /** meta.fuente_decision del backend (solo capturas validadas por el servidor). */
+  fuente?: Fuente
   status: Status
   motivo: string
   explicacion: string
@@ -42,6 +47,8 @@ export interface Lote {
 export interface Foto {
   file: File
   url: string
+  ancho: number
+  alto: number
 }
 
 export interface CapturaForm {

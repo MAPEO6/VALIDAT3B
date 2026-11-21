@@ -13,5 +13,5 @@ export function nowLabel() {
   return `Hoy, ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-export const valLabel: Record<Val, string> = { ok: 'ok', falla: 'falla', dudoso: 'dudoso', na: 'sin datos' }
-export const valKind: Record<Val, ChipKind> = { ok: 'ok', falla: 'bad', dudoso: 'warn', na: 'na' }
+export const valLabel: Record<Val, string> = { ok: 'correcto', falla: 'falla', na: 'sin datos' }
+export const valKind: Record<Val, ChipKind> = { ok: 'ok', falla: 'bad', na: 'na' }

@@ -3,7 +3,7 @@ import { chip, money } from '../format'
 import { IconSend } from '../icons'
 
 export function PriceCheck() {
-  const { queue, pcOff, togglePc, toggleAllPc, allPcOn, pcSelIds, sendPc, batches } = useApp()
+  const { queue, pcOff, togglePc, toggleAllPc, allPcOn, pcSelIds, sendPc, batches, setNav } = useApp()
   return (
     <div className="grid12">
       <section className="card card--flush span8">
@@ -27,13 +27,18 @@ export function PriceCheck() {
             <span className="pc-row__price">{money(p.precio)}</span>
           </label>
         ))}
-        {queue.length === 0 && <div className="muted-center muted-center--lg">No hay productos en cola. Los validados (por el modelo o manualmente) llegan aquí.</div>}
+        {queue.length === 0 && (
+          <div className="muted-center muted-center--lg">
+            No hay productos en cola. Los validados (por el modelo o manualmente) llegan aquí.
+            <div><button className="btn btn--outline" onClick={() => setNav('revision')}>Ir a Revisión manual</button></div>
+          </div>
+        )}
       </section>
 
       <div className="span4 stack stack--18">
         <section className="card card--gap12">
           <div className="big-number">{pcSelIds.length}</div>
-          <div className="muted-dark">productos seleccionados para el flujo de PriceCheck</div>
+          <div className="muted-dark">de {queue.length} productos seleccionados para el flujo de PriceCheck. Se pedirá confirmación antes de enviar.</div>
           <button className="btn btn--blue btn--lg" disabled={pcSelIds.length === 0} onClick={sendPc}>
             <IconSend size={17} /> Añadir a PriceCheck
           </button>
