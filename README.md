@@ -4,136 +4,225 @@
 
 ## Descripción
 
-Proyecto desarrollado para el **Reto 2 · Validat3B del Hackatón Tiendas 3B**.
+Proyecto desarrollado para el **Reto 2 · Validat3B del Hackatón Tiendas
+3B**.
 
-El objetivo es desarrollar un motor con inteligencia artificial que analice capturas de campo, determine si sus evidencias son confiables y explique los motivos de su decisión.
+El objetivo es desarrollar un motor con inteligencia artificial que
+analice capturas de campo, determine si sus evidencias son confiables y
+explique los motivos de su decisión.
 
-El sistema evalúa fotografías, códigos de barras y metadatos para reducir la revisión manual sin comprometer la calidad de la información.
+El sistema evalúa fotografías, códigos de barras y metadatos para
+reducir la revisión manual sin comprometer la calidad de la información.
 
 ## Tecnologías
 
 ### Frontend
-- React
-- TypeScript
-- Vite
+
+-   React
+-   TypeScript
+-   Vite
 
 ### Backend
-- Node.js 24
+
+-   Node.js 24
+-   TypeScript
+-   Fastify
 
 ### Inteligencia artificial
-- Azure AI Foundry
-- Claude Haiku 5.5 (`claude-haiku-5-5`)
+
+-   Azure AI Foundry
+-   Claude Haiku 5.5 (`claude-haiku-5-5`)
 
 ## Requisitos previos
 
-- Node.js 24
-- npm
+-   Node.js 24
+-   npm
 
 ## Instalación
 
-Clonar el repositorio y acceder al directorio del frontend:
+Clonar el repositorio:
 
-```bash
+``` bash
+git clone <URL_DEL_REPOSITORIO>
+```
+
+### Frontend
+
+Acceder al directorio del frontend:
+
+``` bash
 cd frontend
 ```
 
 Instalar las dependencias:
 
-```bash
+``` bash
 npm ci
 ```
 
+### Backend
+
+Desde la raíz del proyecto, acceder al directorio del backend:
+
+``` bash
+cd backend
+```
+
+Instalar las dependencias:
+
+``` bash
+npm ci
+```
+
+> **Nota:** El backend debe incluir sus archivos `package.json` y
+> `package-lock.json` actualizados para permitir la instalación
+> reproducible mediante `npm ci`.
+
 ## Ejecución en desarrollo
 
-```bash
+### Frontend
+
+Desde el directorio `frontend`:
+
+``` bash
+npm run dev
+```
+
+### Backend
+
+Desde el directorio `backend`:
+
+``` bash
 npm run dev
 ```
 
 ## Compilación
 
-```bash
+### Frontend
+
+Desde el directorio `frontend`:
+
+``` bash
+npm run build
+```
+
+### Backend
+
+Desde el directorio `backend`:
+
+``` bash
 npm run build
 ```
 
 ## Revisión de código
 
-```bash
+### Frontend
+
+Desde el directorio `frontend`:
+
+``` bash
 npm run lint
 ```
 
+### Backend
+
+Desde el directorio `backend`:
+
+``` bash
+npm run lint
+```
+
+> Los comandos de desarrollo, compilación y revisión de código dependen
+> de los scripts definidos en el `package.json` correspondiente.
+
 ## Funcionamiento del sistema
 
-Cada captura está relacionada mediante un identificador único (`capture_id`) e incluye:
+Cada captura está relacionada mediante un identificador único
+(`capture_id`) e incluye:
 
-- Fotografía de la fachada de la tienda.
-- Fotografía del producto.
-- Fotografía de la etiqueta de precio.
-- Código de barras capturado.
-- Producto o contratipo esperado.
-- Cadena y tienda seleccionadas.
-- Fecha, hora y metadatos de la aplicación.
+-   Fotografía de la fachada de la tienda.
+-   Fotografía del producto.
+-   Fotografía de la etiqueta de precio.
+-   Código de barras capturado.
+-   Producto o contratipo esperado.
+-   Cadena y tienda seleccionadas.
+-   Fecha, hora y metadatos de la aplicación.
 
-El sistema utiliza un catálogo de referencia con SKU, descripción, marca, contenido, códigos de barras y contratipos permitidos, además de las reglas de negocio proporcionadas por el comité.
+El sistema utiliza un catálogo de referencia con SKU, descripción,
+marca, contenido, códigos de barras y contratipos permitidos, además de
+las reglas de negocio proporcionadas por el comité.
 
 ### Frentes de validación
 
-**A. Identidad del producto (~61% de los rechazos)**
+**A. Identidad del producto (\~61% de los rechazos)**
 
-- Contratipo inválido.
-- Producto que no coincide con la descripción.
-- Descripción incompleta.
-- Producto no visible.
+-   Contratipo inválido.
+-   Producto que no coincide con la descripción.
+-   Descripción incompleta.
+-   Producto no visible.
 
-**B. Calidad de la evidencia (~29% de los rechazos)**
+**B. Calidad de la evidencia (\~29% de los rechazos)**
 
-- Fachada incorrecta.
-- Fotografía demasiado lejana.
-- Imagen borrosa.
-- Fotografía tomada a la pantalla de otro celular.
+-   Fachada incorrecta.
+-   Fotografía demasiado lejana.
+-   Imagen borrosa.
+-   Fotografía tomada a la pantalla de otro celular.
 
-**C. Evidencia de precio (~10% de los rechazos)**
+**C. Evidencia de precio (\~10% de los rechazos)**
 
-- Ausencia de etiqueta de precio.
-- Falta del precio unitario.
+-   Ausencia de etiqueta de precio.
+-   Falta del precio unitario.
 
 ### Decisiones posibles
 
-- `aprobada`: la evidencia cumple con las validaciones.
-- `rechazada`: se identifica algún incumplimiento.
-- `revision_manual`: existe incertidumbre y se requiere una revisión adicional.
+-   `aprobada`: la evidencia cumple con las validaciones.
+-   `rechazada`: se identifica algún incumplimiento.
+-   `revision_manual`: existe incertidumbre y se requiere una revisión
+    adicional.
 
 ## Azure AI Foundry
 
-La solución utilizará el endpoint asignado al equipo por el comité organizador.
+La solución utilizará el endpoint asignado al equipo por el comité
+organizador.
 
-| Parámetro | Valor |
-|---|---|
-| Proyecto | `https://softwaredevelopment-resource.services.ai.azure.com/api/projects/softwaredevelopment` |
-| Endpoint | `https://softwaredevelopment-resource.services.ai.azure.com/anthropic` |
-| Modelo | `claude-haiku-5-5` |
-| API Key | Proporcionada al equipo por el comité |
+  -----------------------------------------------------------------------------------------------------------------------------------
+  Parámetro                           Valor
+  ----------------------------------- -----------------------------------------------------------------------------------------------
+  Proyecto                            `https://softwaredevelopment-resource.services.ai.azure.com/api/projects/softwaredevelopment`
 
-Las credenciales deben administrarse mediante variables de entorno en el backend. La API Key no debe exponerse en el frontend ni subirse al repositorio.
+  Endpoint                            `https://softwaredevelopment-resource.services.ai.azure.com/anthropic`
 
-El comité proporciona un ejemplo de conexión mediante el SDK de Anthropic para Python. La integración desde Node.js 24 deberá verificarse con el endpoint asignado.
+  Modelo                              `claude-haiku-5-5`
+
+  API Key                             Proporcionada al equipo por el comité
+  -----------------------------------------------------------------------------------------------------------------------------------
+
+Las credenciales deben administrarse mediante variables de entorno en el
+backend. La API Key no debe exponerse en el frontend ni subirse al
+repositorio.
+
+El comité proporciona un ejemplo de conexión mediante el SDK de
+Anthropic para Python. La integración desde Node.js 24 deberá
+verificarse con el endpoint asignado.
 
 ## Conjuntos de datos
 
-| Conjunto | Etiquetas | Propósito |
-|---|---|---|
-| Entrenamiento | Sí | Explorar, construir y ajustar la solución. |
-| Validación | Sí | Medir el costo operativo antes del cierre. |
-| Ciego | No | Evaluación final del sistema. |
+  Conjunto        Etiquetas   Propósito
+  --------------- ----------- --------------------------------------------
+  Entrenamiento   Sí          Explorar, construir y ajustar la solución.
+  Validación      Sí          Medir el costo operativo antes del cierre.
+  Ciego           No          Evaluación final del sistema.
 
 Las imágenes y los metadatos se relacionan mediante `capture_id`.
 
 ## Formato de salida
 
-El sistema debe generar un archivo JSON con una respuesta por captura, respetando el esquema oficial.
+El sistema debe generar un archivo JSON con una respuesta por captura,
+respetando el esquema oficial.
 
 Ejemplo:
 
-```json
+``` json
 {
   "capture_id": "CAP-000123",
   "decision": "rechazada",
@@ -151,62 +240,71 @@ Ejemplo:
 }
 ```
 
-La lista oficial de `reason_code` se proporciona junto con los datos del reto.
+La lista oficial de `reason_code` se proporciona junto con los datos del
+reto.
 
 ## Entregables
 
-1. Resultados del conjunto ciego en formato JSON.
-2. Código fuente o notebook utilizado para generar los resultados, con instrucciones de ejecución.
-3. Ficha técnica de una página.
-4. Pitch de tres minutos ante el jurado.
+1.  Resultados del conjunto ciego en formato JSON.
+2.  Código fuente o notebook utilizado para generar los resultados, con
+    instrucciones de ejecución.
+3.  Ficha técnica de una página.
+4.  Pitch de tres minutos ante el jurado.
 
 ## Criterios de evaluación
 
 ### Requisitos para entrar en la clasificación
 
-- Precisión de aprobaciones igual o superior al 97%.
-- JSON válido en al menos el 99% de las capturas.
-- Entrega dentro del tiempo establecido.
+-   Precisión de aprobaciones igual o superior al 97%.
+-   JSON válido en al menos el 99% de las capturas.
+-   Entrega dentro del tiempo establecido.
 
 ### Ponderación
 
-| Criterio | Peso |
-|---|---:|
-| Costo operativo | 50% |
-| Calidad del dato | 15% |
-| Eficiencia (tokens por captura) | 10% |
-| Pitch | 25% |
-| **Total** | **100%** |
+  Criterio                                Peso
+  --------------------------------- ----------
+  Costo operativo                          50%
+  Calidad del dato                         15%
+  Eficiencia (tokens por captura)          10%
+  Pitch                                    25%
+  **Total**                           **100%**
 
 ### Costo operativo
 
-| Resultado | Puntos |
-|---|---:|
-| Aprobada o rechazada correctamente | 0 |
-| Revisión manual | 1 |
-| Rechazada siendo válida | 3 |
-| Aprobada siendo inválida | 10 |
+  Resultado                              Puntos
+  ------------------------------------ --------
+  Aprobada o rechazada correctamente          0
+  Revisión manual                             1
+  Rechazada siendo válida                     3
+  Aprobada siendo inválida                   10
 
 ## Reglas y restricciones
 
-- Se dispone de seis horas efectivas de desarrollo, sin prórrogas.
-- El conjunto ciego se libera al cierre.
-- Cada equipo recibe su propio endpoint y API Key.
-- Las llaves no deben compartirse fuera del equipo.
-- Todas las llaves tienen el mismo límite de tokens por minuto.
-- Se permite combinar modelos de IA, visión por computadora, OCR, reglas y librerías de código abierto locales.
-- No se permite utilizar APIs o servicios de IA externos al endpoint asignado.
-- Las imágenes y los datos de Tiendas 3B deben permanecer dentro del entorno autorizado.
-- Las decisiones del conjunto ciego deben generarse automáticamente mediante la solución.
+-   Se dispone de seis horas efectivas de desarrollo, sin prórrogas.
+-   El conjunto ciego se libera al cierre.
+-   Cada equipo recibe su propio endpoint y API Key.
+-   Las llaves no deben compartirse fuera del equipo.
+-   Todas las llaves tienen el mismo límite de tokens por minuto.
+-   Se permite combinar modelos de IA, visión por computadora, OCR,
+    reglas y librerías de código abierto locales.
+-   No se permite utilizar APIs o servicios de IA externos al endpoint
+    asignado.
+-   Las imágenes y los datos de Tiendas 3B deben permanecer dentro del
+    entorno autorizado.
+-   Las decisiones del conjunto ciego deben generarse automáticamente
+    mediante la solución.
 
 ## Datos del reto
 
-- [Descargar imágenes](https://hackaton3b.com/descargas/Validat3B_desarrollo_imagenes.zip)
-- [Descargar metadatos](https://hackaton3b.com/descargas/Validat3B_desarrollo_metadatos.zip)
-- [Consultar bases oficiales](https://hackaton3b.com/validat3b.html)
+-   [Descargar
+    imágenes](https://hackaton3b.com/descargas/Validat3B_desarrollo_imagenes.zip)
+-   [Descargar
+    metadatos](https://hackaton3b.com/descargas/Validat3B_desarrollo_metadatos.zip)
+-   [Consultar bases oficiales](https://hackaton3b.com/validat3b.html)
 
----
+------------------------------------------------------------------------
 
-**VALIDAT3B | Hackatón Tiendas 3B**
+**VALIDAT3B \| Hackatón Tiendas 3B**
 
-*Las reglas, criterios y listas oficiales del comité organizador prevalecen ante cualquier diferencia.*
+*Las reglas, criterios y listas oficiales del comité organizador
+prevalecen ante cualquier diferencia.*
