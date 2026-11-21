@@ -1,71 +1,52 @@
-import { useState } from "react";
-import { validar } from "./api";
+import { AppProvider } from './AppProvider'
+import { useApp } from './context'
+import { TITLES } from './data'
+import { IconDownload } from './icons'
+import { MobileChrome } from './components/MobileChrome'
+import { Sidebar } from './components/Sidebar'
+import { Toast } from './components/Toast'
+import { NuevaValidacion } from './views/NuevaValidacion'
+import { PriceCheck } from './views/PriceCheck'
+import { Rechazados } from './views/Rechazados'
+import { RevisionManual } from './views/RevisionManual'
+import { Validados } from './views/Validados'
+
+function Shell() {
+  const { nav, downloadExcel } = useApp()
+  const [title, subtitle] = TITLES[nav]
+  return (
+    <div className="app">
+      <Sidebar />
+      <MobileChrome />
+      <main className="main">
+        <header className="main__head">
+          <div>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+          <div className="main__tools">
+            <button className="btn btn--green btn--lg" onClick={downloadExcel}>
+              <IconDownload size={17} /> Descargar todo en Excel
+            </button>
+            <div className="avatar" aria-hidden="true">MG</div>
+          </div>
+        </header>
+        <p className="mobile-sub">{subtitle}</p>
+        {nav === 'nueva' && <NuevaValidacion />}
+        {nav === 'revision' && <RevisionManual />}
+        {nav === 'pricecheck' && <PriceCheck />}
+        {nav === 'validados' && <Validados />}
+        {nav === 'rechazados' && <Rechazados />}
+      </main>
+      <Toast />
+    </div>
+  )
+}
 
 export default function App() {
-  const [fotos, setFotos] = useState<
-    Partial<Record<"fachada" | "producto" | "etiqueta", File>>
-  >({});
-  const [captureId, setCaptureId] = useState("CAP-000123");
-  const [barras, setBarras] = useState("");
-  const [esperado, setEsperado] = useState("");
-  const [out, setOut] = useState<unknown>(null);
-  const [loading, setLoading] = useState(false);
-
-  const listo = fotos.fachada && fotos.producto && fotos.etiqueta;
-
-  async function enviar() {
-    setLoading(true);
-    try {
-      setOut(
-        await validar(
-          {
-            capture_id: captureId,
-            codigo_barras: barras,
-            producto_esperado: esperado,
-          },
-          fotos as Required<typeof fotos>,
-        ),
-      );
-    } catch (e) {
-      setOut({ error: String(e) });
-    }
-    setLoading(false);
-  }
-
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", textAlign: "left" }}>
-      <h1>Validat3B</h1>
-      <input
-        value={captureId}
-        onChange={(e) => setCaptureId(e.target.value)}
-        placeholder="capture_id"
-      />
-      <input
-        value={barras}
-        onChange={(e) => setBarras(e.target.value)}
-        placeholder="Código de barras"
-      />
-      <input
-        value={esperado}
-        onChange={(e) => setEsperado(e.target.value)}
-        placeholder="Producto esperado"
-      />
-      {(["fachada", "producto", "etiqueta"] as const).map((k) => (
-        <label key={k} style={{ display: "block", margin: ".5rem 0" }}>
-          {k}:{" "}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) =>
-              setFotos((f) => ({ ...f, [k]: e.target.files?.[0] }))
-            }
-          />
-        </label>
-      ))}
-      <button disabled={!listo || loading} onClick={enviar}>
-        {loading ? "Analizando…" : "Validar"}
-      </button>
-      <pre>{out ? JSON.stringify(out, null, 2) : ""}</pre>
-    </main>
-  );
+    <AppProvider>
+      <Shell />
+    </AppProvider>
+  )
 }

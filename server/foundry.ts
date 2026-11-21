@@ -39,16 +39,13 @@ export async function callModel(
     }),
   });
   if (!res.ok) throw new Error(`Foundry ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as {
-    content: { type: string; text?: string }[];
-    usage: { input_tokens: number; output_tokens: number };
-  };
+  const data = await res.json();
   const text = data.content
-    .filter((b) => b.type === "text")
-    .map((b) => b.text ?? "")
+    .filter((b: any) => b.type === "text")
+    .map((b: any) => b.text)
     .join("");
   return {
     text,
-    usage: data.usage,
+    usage: data.usage as { input_tokens: number; output_tokens: number },
   };
 }

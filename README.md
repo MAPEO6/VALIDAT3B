@@ -4,6 +4,26 @@ Motor de validación de capturas de precio.
 
 Aplicación que recibe **3 imágenes** de una captura de campo (fachada, producto y etiqueta de precio) más sus datos (capture_id, código de barras, producto esperado) y devuelve un **JSON** con la decisión (`aprobada`, `rechazada` o `revision_manual`), el nivel de confianza, el motivo, el precio detectado y una explicación. El análisis lo hace un modelo de visión desplegado en **Azure AI Foundry**.
 
+## 0. Frontend (diseño, sin backend)
+
+La interfaz está construida en React + TypeScript + Vite siguiendo el diseño de `VALIDAT3B - Panel de Validación`. **Solo es diseño**: todo vive en memoria y la validación es simulada; no se llama a `/api/validar`.
+
+```bash
+npm install
+npm run dev        # solo el frontend, http://localhost:5173
+```
+
+| Ruta | Contenido |
+|---|---|
+| `src/useAppState.ts` | Todo el estado y las acciones (un hook + `AppContext`). **`validar()` es el punto de conexión al backend**: ahí se reemplaza `buildSimulated` por la llamada a `POST /api/validar`. |
+| `src/data.ts` | Datos de ejemplo, motivos de rechazo (provisionales), textos y la simulación de resultados. |
+| `src/views/` | Una vista por sección: Nueva validación, Revisión manual, PriceCheck, Validados, Rechazados. |
+| `src/components/` | Barra lateral, barra superior/inferior/menú móvil, avisos, miniaturas. |
+| `src/export.ts` | Descarga de JSON (formato de `/api/validar`) y Excel (`xlsx`). |
+| `src/index.css` | Estilos; en pantallas menores a 900 px pasa a diseño móvil. |
+
+El control **Demo del resultado** (en la tarjeta de resultado, antes de validar) fuerza el resultado simulado: aprobada, revisión, rechazada o error técnico. Se elimina al conectar el backend.
+
 ## 1. Qué cambió respecto a la plantilla de Vite
 
 | Archivo               | Cambio                             | Para qué                                                                                 |
