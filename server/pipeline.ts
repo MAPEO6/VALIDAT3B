@@ -3,6 +3,7 @@
 import type { Captura } from "./dataset.ts";
 import type { IndiceDuplicados } from "./duplicados.ts";
 import type { OpcionesImagen } from "./imagen.ts";
+import { decidir, PARAMETROS_DEFECTO, type ParametrosDecision } from "./decision.ts";
 import { OPCIONES_REGLAS_DEFECTO, piden_revision, reglasPosteriores, reglasPrevias, resumen, type DatosCampo, type OpcionesReglas, type Senal } from "./reglas.ts";
 import { preprocesarCaptura, type AnalisisCaptura, type SalidaPreprocesado } from "./preprocesado.ts";
 import { FoundryError, llamarModelo, type ContentBlock, type OpcionesFoundry, type Usage } from "./foundry.ts";
@@ -30,6 +31,7 @@ export interface SalidaPipeline {
   respuesta_modelo?: string; // texto crudo, solo para depuración
   analisis?: AnalisisCaptura; // señales locales (módulo 5) para reglas y decisión
   reglas: Senal[]; // señales de las reglas deterministas (módulo 6)
+  ia?: RespuestaIA; // evaluación del modelo ya validada (se guarda en el lote para recalibrar sin re-llamar)
 }
 
 export interface OpcionesPipeline {
@@ -41,6 +43,7 @@ export interface OpcionesPipeline {
   indiceDuplicados?: IndiceDuplicados; // compartido entre capturas (API o lote)
   leerCodigos?: boolean; // lectura local de código de barras (default: sí)
   reglas?: OpcionesReglas;
+  decision?: ParametrosDecision; // motor de decisión (módulo 7)
 }
 
 // PROVISIONAL (lo reemplaza el motor de decisión del módulo 7).
@@ -208,20 +211,9 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
       usage = sumar(usage, r.usage);
       ultimoTexto = r.text;
       const ia = RespuestaIASchema.parse(extraerJson(r.text));
-      let resultado = ResultadoSchema.parse(aResultado(id, ia, opts.umbralAprobacion));
-      // 4) Reglas posteriores: una discrepancia nunca deja pasar una aprobación.
-      const post = reglasPosteriores(campo, ia.precio_detectado, opts.reglas ?? OPCIONES_REGLAS_DEFECTO);
-      reglas = [...reglas, ...post];
-      const revisar = piden_revision(post);
-      if (revisar.length && resultado.decision === "aprobada") {
-        resultado = ResultadoSchema.parse({
-          ...resultado,
-          decision: "revision_manual",
-          confidence_score: confianzaDe("revision_manual", ia.probabilidad_valida),
-          explicacion: `${resultado.explicacion} (Enviada a revisión: ${resumen(revisar)}.)`,
-        });
-      }
-      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text, analisis, reglas };
+      reglas = [...reglas, ...reglasPosteriores(campo, ia.precio_detectado, opts.reglas ?? OPCIONES_REGLAS_DEFECTO)];
+      const resultado = decidir(id, ia, reglas, analisis, opts.decision ?? PARAMETROS_DEFECTO);
+      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text, analisis, reglas, ia };
     } catch (e) {
       if (e instanceof FoundryError) return error(e.message); // ya reintentó lo transitorio
       ultimoProblema = `respuesta del modelo inválida: ${(e as Error).message.slice(0, 200)}`;

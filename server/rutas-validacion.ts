@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { opcionesFoundry, opcionesImagen, opcionesReglas, type Config } from "./config.ts";
+import { cargarParametros } from "./decision.ts";
 import { IndiceDuplicados } from "./duplicados.ts";
 import { TIPOS_IMAGEN, type ProveedorDataset } from "./dataset.ts";
 import { ApiError } from "./errors.ts";
@@ -31,6 +32,7 @@ export function registrarRutasValidacion(
   const foundry = foundryBase ? { ...foundryBase, fetchImpl } : null;
   // Un índice por proceso: detecta fotos de producto/etiqueta reutilizadas entre capturas validadas.
   const indiceDuplicados = new IndiceDuplicados(config.DUP_UMBRAL_HAMMING);
+  const parametrosDecision = cargarParametros(); // config/decision.json (o los de defecto)
 
   async function responder(req: FastifyRequest<{ Querystring: Query }>, entrada: EntradaPipeline): Promise<RespuestaValidar> {
     const inicio = performance.now();
@@ -53,6 +55,7 @@ export function registrarRutasValidacion(
       indiceDuplicados,
       leerCodigos: config.LEER_CODIGOS,
       reglas: opcionesReglas(config),
+      decision: parametrosDecision,
     });
     const respuesta: RespuestaValidar = {
       resultado: salida.resultado,

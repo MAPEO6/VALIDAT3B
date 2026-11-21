@@ -17,7 +17,9 @@
     "score": "tsx scripts/score.ts",
     "baseline": "tsx scripts/baseline.ts",
     "validar": "tsx scripts/validar-una.ts",
-    "imagenes:analizar": "tsx scripts/analizar-imagenes.ts"
+    "imagenes:analizar": "tsx scripts/analizar-imagenes.ts",
+    "lote": "tsx scripts/lote.ts",
+    "calibrar": "tsx scripts/calibrar.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.9",
