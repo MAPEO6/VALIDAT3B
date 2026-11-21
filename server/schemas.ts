@@ -63,7 +63,14 @@ export const RespuestaValidarSchema = z.object({
     fuente_decision: z.enum(["mock", "regla", "ia", "error"]),
   }),
   // Solo con ?debug=1: texto crudo del modelo e intentos (para pruebas).
-  debug: z.object({ respuesta_modelo: z.string().nullable(), intentos_modelo: z.number() }).optional(),
+  debug: z
+    .object({
+      respuesta_modelo: z.string().nullable(),
+      intentos_modelo: z.number(),
+      analisis_imagenes: z.unknown().optional(), // AnalisisCaptura (server/preprocesado.ts)
+      reglas: z.unknown().optional(), // Senal[] (server/reglas.ts)
+    })
+    .optional(),
 });
 export type RespuestaValidar = z.infer<typeof RespuestaValidarSchema>;
 
@@ -91,6 +98,7 @@ export type ErrorRespuesta = z.infer<typeof ErrorSchema>;
 export const MetaEntradaSchema = z.object({
   capture_id: z.string().min(1),
   codigo_barras: z.union([z.string(), z.number()]).optional(),
+  precio_capturado: z.coerce.number().optional(),
   producto_esperado: z.string().optional(),
   tienda: z.string().optional(),
   marca: z.string().optional(),

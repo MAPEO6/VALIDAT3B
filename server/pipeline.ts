@@ -1,6 +1,11 @@
 // Valida UNA captura: imágenes + contexto → modelo → JSON oficial.
 // Cualquier fallo técnico termina en revision_manual (costo 1), nunca en aprobada.
 import type { Captura } from "./dataset.ts";
+import type { IndiceDuplicados } from "./duplicados.ts";
+import type { OpcionesImagen } from "./imagen.ts";
+import { decidir, PARAMETROS_DEFECTO, type ParametrosDecision } from "./decision.ts";
+import { OPCIONES_REGLAS_DEFECTO, piden_revision, reglasPosteriores, reglasPrevias, resumen, type DatosCampo, type OpcionesReglas, type Senal } from "./reglas.ts";
+import { preprocesarCaptura, type AnalisisCaptura, type SalidaPreprocesado } from "./preprocesado.ts";
 import { FoundryError, llamarModelo, type ContentBlock, type OpcionesFoundry, type Usage } from "./foundry.ts";
 import { resultadoTecnico } from "./mock.ts";
 import { RespuestaIASchema, SYSTEM_PROMPT, extraerJson, textoUsuario, type ContextoCaptura, type RespuestaIA } from "./prompt.ts";
@@ -13,16 +18,20 @@ export interface ImagenesCaptura {
 }
 
 export interface EntradaPipeline {
-  contexto: ContextoCaptura;
+  contexto: ContextoCaptura; // lo que ve el modelo
   imagenes: ImagenesCaptura;
+  campo?: DatosCampo; // datos de campo para las reglas (no se envían al modelo)
 }
 
 export interface SalidaPipeline {
   resultado: Resultado;
   usage: Usage;
-  fuente_decision: "ia" | "error";
+  fuente_decision: "ia" | "regla" | "error";
   intentos_modelo: number;
   respuesta_modelo?: string; // texto crudo, solo para depuración
+  analisis?: AnalisisCaptura; // señales locales (módulo 5) para reglas y decisión
+  reglas: Senal[]; // señales de las reglas deterministas (módulo 6)
+  ia?: RespuestaIA; // evaluación del modelo ya validada (se guarda en el lote para recalibrar sin re-llamar)
 }
 
 export interface OpcionesPipeline {
@@ -30,6 +39,11 @@ export interface OpcionesPipeline {
   maxTokens?: number;
   reintentosFormato?: number; // reintentos si el modelo no devuelve JSON válido
   umbralAprobacion?: number;
+  imagen?: OpcionesImagen; // tamaño y calidad de lo que se envía al modelo
+  indiceDuplicados?: IndiceDuplicados; // compartido entre capturas (API o lote)
+  leerCodigos?: boolean; // lectura local de código de barras (default: sí)
+  reglas?: OpcionesReglas;
+  decision?: ParametrosDecision; // motor de decisión (módulo 7)
 }
 
 // PROVISIONAL (lo reemplaza el motor de decisión del módulo 7).
@@ -44,6 +58,16 @@ export function detectarMediaType(buf: Buffer): string | null {
   return null;
 }
 
+export function campoDesdeCaptura(c: Captura): DatosCampo {
+  return {
+    codigo_capturado: c.capture_barcode,
+    codigo_esperado: c.product_barcode,
+    precio_capturado: c.capture_price,
+    precio_min: c.min_product_price,
+    precio_max: c.max_product_price,
+  };
+}
+
 export function contextoDesdeCaptura(c: Captura): ContextoCaptura {
   return {
     capture_id: c.capture_id,
@@ -55,7 +79,7 @@ export function contextoDesdeCaptura(c: Captura): ContextoCaptura {
   };
 }
 
-export function construirContenido(entrada: EntradaPipeline): ContentBlock[] {
+export function construirContenido(contexto: ContextoCaptura, enviar: SalidaPreprocesado["enviar"]): ContentBlock[] {
   const bloques: ContentBlock[] = [];
   const etiquetas: [keyof ImagenesCaptura, string][] = [
     ["facade", "Imagen 1: FACHADA"],
@@ -63,13 +87,11 @@ export function construirContenido(entrada: EntradaPipeline): ContentBlock[] {
     ["shelf", "Imagen 3: ETIQUETA DE PRECIO"],
   ];
   for (const [tipo, titulo] of etiquetas) {
-    const buf = entrada.imagenes[tipo];
-    const media = detectarMediaType(buf);
-    if (!media) throw new Error(`la imagen ${tipo} no es JPEG, PNG, WEBP ni GIF`);
+    const img = enviar[tipo];
     bloques.push({ type: "text", text: titulo });
-    bloques.push({ type: "image", source: { type: "base64", media_type: media, data: buf.toString("base64") } });
+    bloques.push({ type: "image", source: { type: "base64", media_type: img.media_type, data: img.buffer.toString("base64") } });
   }
-  bloques.push({ type: "text", text: textoUsuario(entrada.contexto) });
+  bloques.push({ type: "text", text: textoUsuario(contexto) });
   return bloques;
 }
 
@@ -111,6 +133,20 @@ export function aResultado(captureId: string, ia: RespuestaIA, umbral = UMBRAL_A
   };
 }
 
+// Revisión manual decidida por reglas, sin modelo. Convención: lo no verificado se reporta como "falla".
+export function resultadoPorRegla(captureId: string, senales: Senal[]): Resultado {
+  return ResultadoSchema.parse({
+    capture_id: captureId,
+    decision: "revision_manual",
+    confidence_score: 1,
+    reason_code: null,
+    validaciones: { tienda_fachada: "falla", producto: "falla", codigo_barras: "falla", evidencia_precio: "falla" },
+    precio_detectado: null,
+    codigo_barras_detectado: null,
+    explicacion: `Revisión manual por reglas: ${resumen(senales)}.`,
+  });
+}
+
 const sumar = (a: Usage, b: Usage): Usage => ({
   input_tokens: a.input_tokens + b.input_tokens,
   output_tokens: a.output_tokens + b.output_tokens,
@@ -121,22 +157,53 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
   let usage: Usage = { input_tokens: 0, output_tokens: 0 };
   let intentos = 0;
   let ultimoTexto: string | undefined;
+  let analisis: AnalisisCaptura | undefined;
+  let reglas: Senal[] = [];
   const error = (motivo: string): SalidaPipeline => ({
     resultado: resultadoTecnico(id, motivo),
     usage,
     fuente_decision: "error",
     intentos_modelo: intentos,
     respuesta_modelo: ultimoTexto,
+    analisis,
+    reglas,
   });
 
-  if (!opts.foundry) return error("Foundry no configurado (FOUNDRY_API_KEY / FOUNDRY_ENDPOINT)");
-
-  let contenido: ContentBlock[];
-  try {
-    contenido = construirContenido(entrada);
-  } catch (e) {
-    return error((e as Error).message);
+  // 1) Preprocesado local (sharp + código de barras + duplicados). Una imagen ilegible es error técnico.
+  for (const [tipo, buf] of Object.entries(entrada.imagenes)) {
+    if (!detectarMediaType(buf)) return error(`la imagen ${tipo} no es JPEG, PNG, WEBP ni GIF`);
   }
+  let pre: SalidaPreprocesado;
+  try {
+    pre = await preprocesarCaptura(id, entrada.imagenes, {
+      imagen: opts.imagen,
+      codigoEsperado: entrada.contexto.codigo_barras_esperado,
+      indice: opts.indiceDuplicados,
+      leerBarras: opts.leerCodigos,
+    });
+    analisis = pre.analisis;
+  } catch (e) {
+    return error(`no se pudo procesar la imagen: ${(e as Error).message}`);
+  }
+
+  // 2) Reglas previas: si alguna pide revisión, no tiene caso gastar tokens (nunca se podría aprobar).
+  const campo = entrada.campo ?? {};
+  reglas = reglasPrevias(campo, analisis);
+  const bloquean = piden_revision(reglas);
+  if (bloquean.length) {
+    return {
+      resultado: resultadoPorRegla(id, bloquean),
+      usage,
+      fuente_decision: "regla",
+      intentos_modelo: 0,
+      analisis,
+      reglas,
+    };
+  }
+
+  // 3) Modelo.
+  if (!opts.foundry) return error("Foundry no configurado (FOUNDRY_API_KEY / FOUNDRY_ENDPOINT)");
+  const contenido = construirContenido(entrada.contexto, pre.enviar);
 
   const reintentosFormato = opts.reintentosFormato ?? 1;
   let ultimoProblema = "";
@@ -147,8 +214,9 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
       usage = sumar(usage, r.usage);
       ultimoTexto = r.text;
       const ia = RespuestaIASchema.parse(extraerJson(r.text));
-      const resultado = ResultadoSchema.parse(aResultado(id, ia, opts.umbralAprobacion));
-      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text };
+      reglas = [...reglas, ...reglasPosteriores(campo, ia.precio_detectado, opts.reglas ?? OPCIONES_REGLAS_DEFECTO)];
+      const resultado = decidir(id, ia, reglas, analisis, opts.decision ?? PARAMETROS_DEFECTO);
+      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text, analisis, reglas, ia };
     } catch (e) {
       if (e instanceof FoundryError) return error(e.message); // ya reintentó lo transitorio
       ultimoProblema = `respuesta del modelo inválida: ${(e as Error).message.slice(0, 200)}`;

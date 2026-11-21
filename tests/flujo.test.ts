@@ -3,13 +3,15 @@
 // termine en la lista correcta (Productos validados, Rechazados o Revisión manual).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import sharp from "sharp";
 import { buildApp } from "../server/app.ts";
 import { loadConfig } from "../server/config.ts";
 import { RespuestaValidarSchema } from "../server/schemas.ts";
 import { resultadoACaptura } from "../src/mapping.ts";
 import type { CapturaForm } from "../src/types.ts";
 
-const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 1, 2]);
+// JPEG real y pequeño (desde el módulo 5 las imágenes se decodifican con sharp).
+const JPG = await sharp({ create: { width: 16, height: 16, channels: 3, background: "#808080" } }).jpeg().toBuffer();
 const env = { LOG_LEVEL: "silent", FOUNDRY_API_KEY: "k", FOUNDRY_ENDPOINT: "https://e/anthropic", DATA_DIR: "no-existe" } as NodeJS.ProcessEnv;
 const OK = { tienda_fachada: "ok", producto: "ok", codigo_barras: "ok", evidencia_precio: "ok" };
 
@@ -52,19 +54,20 @@ test("la cadena del formulario llega al modelo", async () => {
   assert.match(sin.prompt, /Cadena seleccionada: no indicada/);
 });
 
+// Los umbrales salen del motor de decisión calibrado (config/decision.json, módulo 7-8).
 test("aprobada → Productos validados", async () => {
-  const { captura } = await enviar(form, { validaciones: OK, probabilidad_valida: 0.98, decision: "aprobada" });
+  const { captura } = await enviar(form, { validaciones: OK, probabilidad_valida: 0.995, decision: "aprobada" });
   assert.equal(captura.status, "validada");
 });
 
-test("4 validaciones ok y probabilidad alta, aunque el modelo diga revisión → Productos validados", async () => {
-  const { captura } = await enviar(form, { validaciones: OK, probabilidad_valida: 0.97, decision: "revision_manual" });
-  assert.equal(captura.status, "validada");
+test("si el modelo sugiere revisión, el motor de decisión la respeta → Revisión manual", async () => {
+  const { captura } = await enviar(form, { validaciones: OK, probabilidad_valida: 0.995, decision: "revision_manual" });
+  assert.equal(captura.status, "revision");
 });
 
 test("rechazada con motivo → Rechazados", async () => {
   const { captura } = await enviar(form, {
-    validaciones: { ...OK, tienda_fachada: "falla" }, probabilidad_valida: 0.05, decision: "rechazada", reason_code: "FACHADA_INCORRECTA",
+    validaciones: { ...OK, tienda_fachada: "falla" }, probabilidad_valida: 0, decision: "rechazada", reason_code: "FACHADA_INCORRECTA",
   });
   assert.equal(captura.status, "rechazada");
   assert.equal(captura.motivo, "FACHADA_INCORRECTA");
