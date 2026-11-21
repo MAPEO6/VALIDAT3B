@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { opcionesFoundry, opcionesImagen, type Config } from "./config.ts";
+import { opcionesFoundry, opcionesImagen, opcionesReglas, type Config } from "./config.ts";
 import { IndiceDuplicados } from "./duplicados.ts";
 import { TIPOS_IMAGEN, type ProveedorDataset } from "./dataset.ts";
 import { ApiError } from "./errors.ts";
 import { resultadoMock } from "./mock.ts";
-import { contextoDesdeCaptura, validarCaptura, type EntradaPipeline, type ImagenesCaptura, type SalidaPipeline } from "./pipeline.ts";
+import { campoDesdeCaptura, contextoDesdeCaptura, validarCaptura, type EntradaPipeline, type ImagenesCaptura, type SalidaPipeline } from "./pipeline.ts";
 import type { ContextoCaptura } from "./prompt.ts";
+import type { DatosCampo } from "./reglas.ts";
 import { DECISIONES, MetaEntradaSchema, RespuestaValidarSchema, type Decision, type RespuestaValidar } from "./schemas.ts";
 
 // Campos del formulario → tipo de imagen interno.
@@ -51,6 +52,7 @@ export function registrarRutasValidacion(
       imagen: opcionesImagen(config),
       indiceDuplicados,
       leerCodigos: config.LEER_CODIGOS,
+      reglas: opcionesReglas(config),
     });
     const respuesta: RespuestaValidar = {
       resultado: salida.resultado,
@@ -62,6 +64,7 @@ export function registrarRutasValidacion(
         respuesta_modelo: salida.respuesta_modelo ?? null,
         intentos_modelo: salida.intentos_modelo,
         analisis_imagenes: salida.analisis,
+        reglas: salida.reglas,
       };
     }
     req.log.info(
@@ -117,13 +120,20 @@ export function registrarRutasValidacion(
       contenido: meta.data.contenido,
       codigo_barras_esperado: meta.data.codigo_barras === undefined ? undefined : String(meta.data.codigo_barras),
     };
+    let campo: DatosCampo = {
+      codigo_capturado: contexto.codigo_barras_esperado,
+      precio_capturado: meta.data.precio_capturado,
+    };
     try {
       const c = (await obtenerDataset()).porId.get(meta.data.capture_id);
-      if (c) contexto = contextoDesdeCaptura(c);
+      if (c) {
+        contexto = contextoDesdeCaptura(c);
+        campo = campoDesdeCaptura(c);
+      }
     } catch {
       // Sin dataset se usan los datos del formulario.
     }
-    return responder(req, { contexto, imagenes: imagenes as ImagenesCaptura });
+    return responder(req, { contexto, campo, imagenes: imagenes as ImagenesCaptura });
   });
 
   // Valida una captura del dataset leyendo sus imágenes de disco (no hay que subir nada).
@@ -137,6 +147,6 @@ export function registrarRutasValidacion(
       throw new ApiError(400, "IMAGENES_FALTANTES", `La captura ${c.capture_id} no tiene en disco: ${faltan.join(", ")}`);
     }
     const [facade, product, shelf] = await Promise.all(TIPOS_IMAGEN.map((t) => readFile(rutas[t]!)));
-    return responder(req, { contexto: contextoDesdeCaptura(c), imagenes: { facade: facade!, product: product!, shelf: shelf! } });
+    return responder(req, { contexto: contextoDesdeCaptura(c), campo: campoDesdeCaptura(c), imagenes: { facade: facade!, product: product!, shelf: shelf! } });
   });
 }
