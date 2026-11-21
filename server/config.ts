@@ -24,6 +24,9 @@ const EnvSchema = z.object({
   IMG_LADO_CORTO: z.coerce.number().int().min(256).default(768),
   IMG_CALIDAD_JPEG: z.coerce.number().int().min(40).max(100).default(85),
   DUP_UMBRAL_HAMMING: z.coerce.number().int().min(0).max(32).default(4),
+  // Reglas: qué hacer si el precio leído en la etiqueta ≠ capture_price
+  REGLA_PRECIO_DISCREPANCIA: z.enum(["revision", "ignorar"]).default("revision"),
+  PRECIO_TOLERANCIA: z.coerce.number().min(0).default(0.01),
   LEER_CODIGOS: z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
 });
 
@@ -57,4 +60,9 @@ export const opcionesImagen = (c: Config) => ({
   ladoLargo: c.IMG_LADO_LARGO,
   ladoCorto: c.IMG_LADO_CORTO,
   calidadJpeg: c.IMG_CALIDAD_JPEG,
+});
+
+export const opcionesReglas = (c: Config) => ({
+  precioDiscrepancia: c.REGLA_PRECIO_DISCREPANCIA,
+  toleranciaPrecio: c.PRECIO_TOLERANCIA,
 });

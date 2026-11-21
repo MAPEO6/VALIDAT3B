@@ -3,6 +3,7 @@
 import type { Captura } from "./dataset.ts";
 import type { IndiceDuplicados } from "./duplicados.ts";
 import type { OpcionesImagen } from "./imagen.ts";
+import { OPCIONES_REGLAS_DEFECTO, piden_revision, reglasPosteriores, reglasPrevias, resumen, type DatosCampo, type OpcionesReglas, type Senal } from "./reglas.ts";
 import { preprocesarCaptura, type AnalisisCaptura, type SalidaPreprocesado } from "./preprocesado.ts";
 import { FoundryError, llamarModelo, type ContentBlock, type OpcionesFoundry, type Usage } from "./foundry.ts";
 import { resultadoTecnico } from "./mock.ts";
@@ -16,17 +17,19 @@ export interface ImagenesCaptura {
 }
 
 export interface EntradaPipeline {
-  contexto: ContextoCaptura;
+  contexto: ContextoCaptura; // lo que ve el modelo
   imagenes: ImagenesCaptura;
+  campo?: DatosCampo; // datos de campo para las reglas (no se envían al modelo)
 }
 
 export interface SalidaPipeline {
   resultado: Resultado;
   usage: Usage;
-  fuente_decision: "ia" | "error";
+  fuente_decision: "ia" | "regla" | "error";
   intentos_modelo: number;
   respuesta_modelo?: string; // texto crudo, solo para depuración
   analisis?: AnalisisCaptura; // señales locales (módulo 5) para reglas y decisión
+  reglas: Senal[]; // señales de las reglas deterministas (módulo 6)
 }
 
 export interface OpcionesPipeline {
@@ -37,6 +40,7 @@ export interface OpcionesPipeline {
   imagen?: OpcionesImagen; // tamaño y calidad de lo que se envía al modelo
   indiceDuplicados?: IndiceDuplicados; // compartido entre capturas (API o lote)
   leerCodigos?: boolean; // lectura local de código de barras (default: sí)
+  reglas?: OpcionesReglas;
 }
 
 // PROVISIONAL (lo reemplaza el motor de decisión del módulo 7).
@@ -49,6 +53,16 @@ export function detectarMediaType(buf: Buffer): string | null {
   if (buf.length >= 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
   if (buf.length >= 6 && /^GIF8[79]a$/.test(buf.toString("ascii", 0, 6))) return "image/gif";
   return null;
+}
+
+export function campoDesdeCaptura(c: Captura): DatosCampo {
+  return {
+    codigo_capturado: c.capture_barcode,
+    codigo_esperado: c.product_barcode,
+    precio_capturado: c.capture_price,
+    precio_min: c.min_product_price,
+    precio_max: c.max_product_price,
+  };
 }
 
 export function contextoDesdeCaptura(c: Captura): ContextoCaptura {
@@ -113,6 +127,20 @@ export function aResultado(captureId: string, ia: RespuestaIA, umbral = UMBRAL_A
   };
 }
 
+// Revisión manual decidida por reglas, sin modelo. Convención: lo no verificado se reporta como "falla".
+export function resultadoPorRegla(captureId: string, senales: Senal[]): Resultado {
+  return ResultadoSchema.parse({
+    capture_id: captureId,
+    decision: "revision_manual",
+    confidence_score: 1,
+    reason_code: null,
+    validaciones: { tienda_fachada: "falla", producto: "falla", codigo_barras: "falla", evidencia_precio: "falla" },
+    precio_detectado: null,
+    codigo_barras_detectado: null,
+    explicacion: `Revisión manual por reglas: ${resumen(senales)}.`,
+  });
+}
+
 const sumar = (a: Usage, b: Usage): Usage => ({
   input_tokens: a.input_tokens + b.input_tokens,
   output_tokens: a.output_tokens + b.output_tokens,
@@ -124,6 +152,7 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
   let intentos = 0;
   let ultimoTexto: string | undefined;
   let analisis: AnalisisCaptura | undefined;
+  let reglas: Senal[] = [];
   const error = (motivo: string): SalidaPipeline => ({
     resultado: resultadoTecnico(id, motivo),
     usage,
@@ -131,6 +160,7 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
     intentos_modelo: intentos,
     respuesta_modelo: ultimoTexto,
     analisis,
+    reglas,
   });
 
   // 1) Preprocesado local (sharp + código de barras + duplicados). Una imagen ilegible es error técnico.
@@ -150,7 +180,22 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
     return error(`no se pudo procesar la imagen: ${(e as Error).message}`);
   }
 
-  // 2) Modelo.
+  // 2) Reglas previas: si alguna pide revisión, no tiene caso gastar tokens (nunca se podría aprobar).
+  const campo = entrada.campo ?? {};
+  reglas = reglasPrevias(campo, analisis);
+  const bloquean = piden_revision(reglas);
+  if (bloquean.length) {
+    return {
+      resultado: resultadoPorRegla(id, bloquean),
+      usage,
+      fuente_decision: "regla",
+      intentos_modelo: 0,
+      analisis,
+      reglas,
+    };
+  }
+
+  // 3) Modelo.
   if (!opts.foundry) return error("Foundry no configurado (FOUNDRY_API_KEY / FOUNDRY_ENDPOINT)");
   const contenido = construirContenido(entrada.contexto, pre.enviar);
 
@@ -163,8 +208,20 @@ export async function validarCaptura(entrada: EntradaPipeline, opts: OpcionesPip
       usage = sumar(usage, r.usage);
       ultimoTexto = r.text;
       const ia = RespuestaIASchema.parse(extraerJson(r.text));
-      const resultado = ResultadoSchema.parse(aResultado(id, ia, opts.umbralAprobacion));
-      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text, analisis };
+      let resultado = ResultadoSchema.parse(aResultado(id, ia, opts.umbralAprobacion));
+      // 4) Reglas posteriores: una discrepancia nunca deja pasar una aprobación.
+      const post = reglasPosteriores(campo, ia.precio_detectado, opts.reglas ?? OPCIONES_REGLAS_DEFECTO);
+      reglas = [...reglas, ...post];
+      const revisar = piden_revision(post);
+      if (revisar.length && resultado.decision === "aprobada") {
+        resultado = ResultadoSchema.parse({
+          ...resultado,
+          decision: "revision_manual",
+          confidence_score: confianzaDe("revision_manual", ia.probabilidad_valida),
+          explicacion: `${resultado.explicacion} (Enviada a revisión: ${resumen(revisar)}.)`,
+        });
+      }
+      return { resultado, usage, fuente_decision: "ia", intentos_modelo: intentos, respuesta_modelo: r.text, analisis, reglas };
     } catch (e) {
       if (e instanceof FoundryError) return error(e.message); // ya reintentó lo transitorio
       ultimoProblema = `respuesta del modelo inválida: ${(e as Error).message.slice(0, 200)}`;
