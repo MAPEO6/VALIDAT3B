@@ -13,7 +13,9 @@
     "start": "tsx server/index.ts",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.server.json",
-    "dataset:check": "tsx scripts/verificar-dataset.ts"
+    "dataset:check": "tsx scripts/verificar-dataset.ts",
+    "score": "tsx scripts/score.ts",
+    "baseline": "tsx scripts/baseline.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.9",

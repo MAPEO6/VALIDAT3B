@@ -28,3 +28,6 @@ dist-ssr
 
 # Dataset del reto (pesado, no se sube)
 data/
+
+# Salidas y reportes generados
+resultados/

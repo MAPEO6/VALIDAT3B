@@ -116,7 +116,7 @@ export async function cargarDataset(opts: OpcionesDataset): Promise<Dataset> {
   try {
     crudoCapturas = JSON.parse(await readFile(rutaCapturas, "utf-8"));
   } catch (e) {
-    throw new Error(`No se pudo leer ${rutaCapturas}: ${(e as Error).message}`);
+    throw new Error(`No se pudo leer ${rutaCapturas}: ${(e as Error).message}`, { cause: e });
   }
   if (!Array.isArray(crudoCapturas)) {
     throw new Error(`${rutaCapturas} debe contener un arreglo JSON de capturas`);
@@ -125,7 +125,7 @@ export async function cargarDataset(opts: OpcionesDataset): Promise<Dataset> {
   try {
     filasCatalogo = parseCsv(await readFile(rutaCatalogo, "utf-8"));
   } catch (e) {
-    throw new Error(`No se pudo leer ${rutaCatalogo}: ${(e as Error).message}`);
+    throw new Error(`No se pudo leer ${rutaCatalogo}: ${(e as Error).message}`, { cause: e });
   }
 
   const reporte: ReporteIntegridad = {

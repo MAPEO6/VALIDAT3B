@@ -1,6 +1,6 @@
 // Lector CSV mínimo (RFC 4180): comillas dobles, comas y saltos de línea dentro de campos, BOM y CRLF.
 export function parseCsv(texto: string): Record<string, string>[] {
-  const src = texto.replace(/^﻿/, "");
+  const src = texto.replace(/^\uFEFF/, "");
   const filas: string[][] = [];
   let fila: string[] = [];
   let campo = "";
