@@ -1,5 +1,5 @@
 /**
- * Cliente del backend Fastify (rama main, Módulo 1).
+ * Cliente del backend Fastify (rama main, Módulos 1–4).
  * Reutiliza los esquemas zod del servidor para que el contrato sea uno solo.
  */
 import { REASON_CODES } from '../server/reason-codes.ts'
@@ -38,6 +38,7 @@ export const MENSAJES_ERROR: Record<CodigoError | 'DESCONOCIDO', string> = {
   SOLICITUD_INVALIDA: 'Alguno de los archivos no es una imagen válida. Cámbialo e inténtalo de nuevo.',
   ARCHIVO_DEMASIADO_GRANDE: 'Una de las fotos es demasiado pesada. Usa una foto más ligera.',
   NO_ENCONTRADO: 'El servidor no tiene el servicio de validación. Avisa al equipo técnico.',
+  DATASET_NO_DISPONIBLE: 'El servidor no encuentra el dataset de capturas. Avisa al equipo técnico.',
   ERROR_INTERNO: 'El servidor tuvo un problema interno.',
   DESCONOCIDO: 'El servidor rechazó la solicitud.',
 }

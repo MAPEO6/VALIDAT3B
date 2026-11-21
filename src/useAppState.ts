@@ -121,7 +121,7 @@ export function useAppState() {
       window.clearInterval(t)
     }
   }, [revisarServidor])
-  const modoMock = servidor.estado === 'ok' && servidor.info.modo === 'mock'
+  const modoMock = servidor.estado === 'ok' && (servidor.info.modo === 'mock' || servidor.info.modo === 'sin_foundry')
 
   // ---------- contador mientras analiza ----------
   useEffect(() => {

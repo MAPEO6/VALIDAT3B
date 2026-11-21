@@ -81,7 +81,7 @@ export const TITLES: Record<View, [string, string]> = {
   rechazados: ['Rechazados', 'Archivo con la información de las capturas rechazadas'],
 }
 
-/** Solo visible mientras el backend esté en modo simulado (GET /api/health → modo "mock"). */
+/** Solo visible mientras el backend esté en modo simulado (GET /api/health → modo "mock", o "sin_foundry" cuando no hay llave de Foundry). */
 export const MOCK_OPCIONES: { value: MockOpcion; label: string }[] = [
   { value: 'auto', label: 'Automático (según Capture ID)' },
   { value: 'aprobada', label: 'Aprobada' },

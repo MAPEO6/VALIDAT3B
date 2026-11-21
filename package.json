@@ -12,7 +12,11 @@
     "dev:all": "concurrently \"npm:server\" \"npm:dev\"",
     "start": "tsx server/index.ts",
     "test": "tsx --test tests/*.test.ts",
-    "typecheck": "tsc -p tsconfig.server.json"
+    "typecheck": "tsc -p tsconfig.server.json",
+    "dataset:check": "tsx scripts/verificar-dataset.ts",
+    "score": "tsx scripts/score.ts",
+    "baseline": "tsx scripts/baseline.ts",
+    "validar": "tsx scripts/validar-una.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.9",

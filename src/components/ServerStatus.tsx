@@ -9,7 +9,9 @@ export function ServerStatus({ dark = false }: { dark?: boolean }) {
     st === 'cargando' ? 'Conectando con el servidor…'
       : st === 'caido' ? 'Servidor sin conexión'
         : servidor.info.modo === 'mock' ? 'Servidor conectado · modo simulado'
-          : 'Servidor conectado'
+          : servidor.info.modo === 'sin_foundry' ? 'Servidor conectado · sin IA (todo va a revisión manual)'
+            : servidor.info.modo === 'ia' ? `Servidor conectado · IA activa${servidor.info.modelo ? ` (${servidor.info.modelo})` : ''}`
+              : 'Servidor conectado'
   return (
     <div className={`srv srv--${st}${dark ? ' srv--dark' : ''}`} role="status" aria-live="polite"
       title={st === 'caido' ? 'Ejecuta «npm run server» (o «npm run dev:all») y vuelve a intentar.' : undefined}>
