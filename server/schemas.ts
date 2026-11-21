@@ -71,6 +71,7 @@ export const CODIGOS_ERROR = [
   "SOLICITUD_INVALIDA",
   "ARCHIVO_DEMASIADO_GRANDE",
   "NO_ENCONTRADO",
+  "DATASET_NO_DISPONIBLE",
   "ERROR_INTERNO",
 ] as const;
 export type CodigoError = (typeof CODIGOS_ERROR)[number];

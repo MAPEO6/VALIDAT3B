@@ -8,6 +8,10 @@ const EnvSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(25),
+  // Dataset del reto: carpeta con capturas.json, catalogo_productos.csv e imagenes/
+  DATA_DIR: z.string().default("./data"),
+  CAPTURAS_FILE: z.string().default("capturas.json"),
+  CATALOGO_FILE: z.string().default("catalogo_productos.csv"),
   // Foundry es opcional en el módulo 1; se exigirá a partir del módulo 4.
   FOUNDRY_API_KEY: z.string().optional(),
   FOUNDRY_ENDPOINT: z.string().optional(),
